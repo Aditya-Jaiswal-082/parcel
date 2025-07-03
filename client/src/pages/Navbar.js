@@ -24,7 +24,7 @@ function Navbar() {
   return (
     <nav>
       <Link to="/">Home</Link> |{' '}
-      {isLoggedIn && <Link to={getDashboardRoute()}>Dashboard</Link>} |{' '}
+      {/* {isLoggedIn && <Link to={getDashboardRoute()}>Dashboard</Link>} |{' '} */}
 
       {isLoggedIn ? (
         <>
@@ -32,6 +32,7 @@ function Navbar() {
             <>
               <Link to="/AddToCart">Create Delivery</Link> |{' '}
               <Link to="/Cart">My Deliveries</Link> |{' '}
+              <Link to="/UserDashboard">User Dashboard</Link> |{' '}
             </>
           )}
 
@@ -39,6 +40,8 @@ function Navbar() {
             <>
               <Link to="/Cart">Assigned Deliveries</Link> |{' '}
               <Link to="/notifications">Notifications</Link> |{' '}
+              <Link to="/AgentDashboard">Agent Dashboard</Link> |{' '}
+
             </>
           )}
 

@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose'); // ✅ Add this line
 
 const DeliverySchema = new mongoose.Schema({
   userId: {
@@ -14,6 +14,11 @@ const DeliverySchema = new mongoose.Schema({
   status: {
     type: String,
     default: 'pending'
+  },
+  assignedAgent: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
   },
   createdAt: {
     type: Date,

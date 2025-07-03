@@ -35,3 +35,4 @@ app.use('/api/notifications', require('./routes/notifications'));
 const notificationRoutes = require('./routes/notification');
 app.use('/api/notifications', notificationRoutes);
 
+app.use('/api/delivery', require('./routes/delivery'));

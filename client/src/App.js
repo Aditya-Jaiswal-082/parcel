@@ -54,7 +54,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/addtocart" element={<AddToCart />} />
         <Route path="/cart" element={<Cart />} />
-        <Route path="/dashboard" element={<RedirectDashboard />} />
+        {/* <Route path="/dashboard" element={<RedirectDashboard />} /> */}
         <Route path="/UserDashboard" element={<UserDashboard />} />
         <Route path="/AgentDashboard" element={<AgentDashboard />} />
         <Route path="/AdminDashboard" element={<AdminDashboard />} />
