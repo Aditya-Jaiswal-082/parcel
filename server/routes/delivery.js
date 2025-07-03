@@ -108,6 +108,49 @@ router.get('/unassigned', async (req, res) => {
   }
 });
 
+// GET /api/delivery/assigned/:agentId
+router.get('/assigned/:agentId', async (req, res) => {
+  const { agentId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(agentId)) {
+    return res.status(400).json({ error: 'Invalid agent ID' });
+  }
+
+  try {
+    const deliveries = await Delivery.find({ assignedAgent: agentId })
+      .populate('userId', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(deliveries);
+  } catch (err) {
+    console.error('❌ Error fetching assigned deliveries:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /api/delivery/complete/:id - mark delivery as completed
+router.patch('/complete/:id', async (req, res) => {
+  try {
+    const deliveryId = req.params.id;
+
+    const delivery = await Delivery.findById(deliveryId);
+    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
+
+    if (delivery.status !== 'assigned') {
+      return res.status(400).json({ error: 'Only assigned deliveries can be completed' });
+    }
+
+    delivery.status = 'completed';
+    await delivery.save();
+
+    res.status(200).json({ message: 'Delivery marked as completed' });
+  } catch (err) {
+    console.error("❌ Completion error:", err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
 // PATCH /api/delivery/claim/:id
 router.patch('/claim/:id', async (req, res) => {
   try {
@@ -132,3 +175,5 @@ router.patch('/claim/:id', async (req, res) => {
 });
 
 module.exports = router;
+
+

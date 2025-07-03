@@ -49,6 +49,7 @@ function Navbar() {
             <>
               <Link to="/admin/users">Manage Users</Link> |{' '}
               <Link to="/notifications">Notifications</Link> |{' '}
+              <Link to="/AdminDashboard">Admin Dashboard</Link> |{' '}
             </>
           )}
 
