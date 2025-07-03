@@ -1,29 +1,42 @@
+// File: src/pages/Cart.js
 import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 
 function Cart() {
-  const [orders, setOrders] = useState([]);
+  const [deliveries, setDeliveries] = useState([]);
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/parcels', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+    const userId = localStorage.getItem('userId');
+    const token = localStorage.getItem('token');
 
-      const data = await res.json();
-      setOrders(data);
+    if (!userId || !token) return;
+
+    const fetchDeliveries = async () => {
+      try {
+        const res = await axios.get(`http://localhost:5000/api/delivery/user/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setDeliveries(res.data);
+      } catch (err) {
+        console.error("Error loading deliveries:", err);
+      }
     };
 
-    fetchOrders();
+    fetchDeliveries();
   }, []);
 
   return (
-    <div>
-      <h2>My Deliveries</h2>
-      {orders.length === 0 ? <p>No deliveries yet.</p> : (
+    <div className="container">
+      <h2>📦 My Deliveries</h2>
+      {deliveries.length === 0 ? (
+        <p>No deliveries yet.</p>
+      ) : (
         <ul>
-          {orders.map((order) => (
-            <li key={order._id}>{order.pickup} → {order.drop}</li>
+          {deliveries.map((d, i) => (
+            <li key={i}>
+              <strong>From:</strong> {d.pickupAddress} | <strong>To:</strong> {d.deliveryAddress} <br />
+              <strong>Status:</strong> {d.status} | <strong>Date:</strong> {new Date(d.createdAt).toLocaleString()}
+            </li>
           ))}
         </ul>
       )}
