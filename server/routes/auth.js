@@ -67,6 +67,7 @@ router.post("/register", async (req, res) => {
   console.log("Incoming signup request:", req.body);  // Add this
 
   // ... rest of the code ...
+
 });
 
 
