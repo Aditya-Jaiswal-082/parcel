@@ -8,6 +8,7 @@ import Cart from './pages/Cart';
 import UserDashboard from './pages/UserDashboard';
 import AgentDashboard from './pages/AgentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import Notifications from './pages/Notifications';
 
 function Home() {
   return (
@@ -57,6 +58,7 @@ function App() {
         <Route path="/UserDashboard" element={<UserDashboard />} />
         <Route path="/AgentDashboard" element={<AgentDashboard />} />
         <Route path="/AdminDashboard" element={<AdminDashboard />} />
+        <Route path="/notifications" element={<Notifications />} />
       </Routes>
     </Router>
   );

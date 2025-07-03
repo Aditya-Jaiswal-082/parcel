@@ -10,40 +10,42 @@ function Navbar() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
+    localStorage.removeItem('userId');
     navigate('/login');
   };
 
   const getDashboardRoute = () => {
-    if (role === 'user') return './UserDashboard';
-    if (role === 'agent') return './AgentDashboard';
-    if (role === 'admin') return './AdminDashboard';
+    if (role === 'user') return '/dashboard/user';
+    if (role === 'agent') return '/dashboard/agent';
+    if (role === 'admin') return '/dashboard/admin';
+    return '/';
   };
 
   return (
     <nav>
       <Link to="/">Home</Link> |{' '}
-      {/* <Link to="./AddToCart">Create Delivery</Link> |{' '}
-      <Link to="./Cart">My Deliveries</Link> |{' '} */}
       {isLoggedIn && <Link to={getDashboardRoute()}>Dashboard</Link>} |{' '}
 
       {isLoggedIn ? (
         <>
           {role === 'user' && (
             <>
-              <Link to="./AddToCart">Create Delivery</Link> |{' '}
-              <Link to="./Cart">My Deliveries</Link> |{' '}
+              <Link to="/AddToCart">Create Delivery</Link> |{' '}
+              <Link to="/Cart">My Deliveries</Link> |{' '}
             </>
           )}
 
           {role === 'agent' && (
             <>
-              <Link to="./Cart">Assigned Deliveries</Link> |{' '}
+              <Link to="/Cart">Assigned Deliveries</Link> |{' '}
+              <Link to="/notifications">Notifications</Link> |{' '}
             </>
           )}
 
           {role === 'admin' && (
             <>
               <Link to="/admin/users">Manage Users</Link> |{' '}
+              <Link to="/notifications">Notifications</Link> |{' '}
             </>
           )}
 
