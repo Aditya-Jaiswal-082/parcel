@@ -30,5 +30,6 @@ app.use("/api/auth", authRoutes);
 const deliveryRoutes = require('./routes/delivery');
 app.use('/api/delivery', deliveryRoutes);
 
+app.use('/api/notifications', require('./routes/notifications'));
 
 
