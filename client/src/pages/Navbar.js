@@ -14,29 +14,30 @@ function Navbar() {
   };
 
   const getDashboardRoute = () => {
-    if (role === 'user') return '/dashboard/user';
-    if (role === 'agent') return '/dashboard/agent';
-    if (role === 'admin') return '/dashboard/admin';
-    return '/';
+    if (role === 'user') return './UserDashboard';
+    if (role === 'agent') return './AgentDashboard';
+    if (role === 'admin') return './AdminDashboard';
   };
 
   return (
     <nav>
       <Link to="/">Home</Link> |{' '}
+      {/* <Link to="./AddToCart">Create Delivery</Link> |{' '}
+      <Link to="./Cart">My Deliveries</Link> |{' '} */}
       {isLoggedIn && <Link to={getDashboardRoute()}>Dashboard</Link>} |{' '}
 
       {isLoggedIn ? (
         <>
           {role === 'user' && (
             <>
-              <Link to="/add">Create Delivery</Link> |{' '}
-              <Link to="/cart">My Deliveries</Link> |{' '}
+              <Link to="./AddToCart">Create Delivery</Link> |{' '}
+              <Link to="./Cart">My Deliveries</Link> |{' '}
             </>
           )}
 
           {role === 'agent' && (
             <>
-              <Link to="/cart">Assigned Deliveries</Link> |{' '}
+              <Link to="./Cart">Assigned Deliveries</Link> |{' '}
             </>
           )}
 

@@ -40,7 +40,7 @@ function RedirectDashboard() {
   if (role === 'user') return <Navigate to="./pages/UserDashboard" />;
   if (role === 'agent') return <Navigate to="./pages/AgentDashboard" />;
   if (role === 'admin') return <Navigate to="./pages/AdminDashboard" />;
-  return <Navigate to="/" />;
+  // return <Navigate to="/" />;
 }
 
 function App() {
@@ -51,12 +51,12 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/add" element={<AddToCart />} />
+        <Route path="/addtocart" element={<AddToCart />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/dashboard" element={<RedirectDashboard />} />
-        <Route path="/dashboard/user" element={<UserDashboard />} />
-        <Route path="/dashboard/agent" element={<AgentDashboard />} />
-        <Route path="/dashboard/admin" element={<AdminDashboard />} />
+        <Route path="/UserDashboard" element={<UserDashboard />} />
+        <Route path="/AgentDashboard" element={<AgentDashboard />} />
+        <Route path="/AdminDashboard" element={<AdminDashboard />} />
       </Routes>
     </Router>
   );

@@ -1,54 +1,65 @@
+// File: src/pages/Login.js
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import './parcel.css';
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+      const res = await axios.post('http://localhost:5000/api/auth/login', {
+        email,
+        password
       });
 
-      const data = await res.json();
+      const { token, role, userId } = res.data;
 
-      if (res.ok) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('role', data.role);
+      // ✅ Save token, role, and user ID in localStorage
+      localStorage.setItem('token', token);
+      localStorage.setItem('role', role);
+      localStorage.setItem('userId', userId);
 
-        if (data.role === 'user') {
-          alert('User logged in successfully!');
-          setTimeout(() => navigate('/UserDashboard'), 100);
-        } else if (data.role === 'agent') {
-          alert('Agent logged in successfully!');
-          setTimeout(() => navigate('/AgentDashboard'), 100);
-        } else if (data.role === 'admin') {
-          alert('Admin logged in successfully!');
-          setTimeout(() => navigate('/AdminDashboard'), 100);
-        } else {
-          alert('Login successful!');
-          navigate('/');
-        }
-      } else {
-        alert(data.message || 'Login failed.');
-      }
-    } catch (error) {
-      console.error(error);
-      alert('An error occurred while logging in.');
+      alert('Login successful');
+
+      // ✅ Redirect based on role
+      if (role === 'admin') navigate('/dashboard/admin');
+      else if (role === 'agent') navigate('/dashboard/agent');
+      else navigate('/dashboard/user');
+
+    } catch (err) {
+      console.error('🔥 Login error:', err.response?.data || err.message);
+      alert('Login failed');
     }
   };
 
   return (
-    <div>
+    <div className="container">
       <h2>Login</h2>
-      <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      <button onClick={handleLogin}>Login</button>
-      <p>Don't have an account? <Link to="/signup">Sign Up</Link></p>
+      <form onSubmit={handleSubmit}>
+        <label>Email</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+
+        <label>Password</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+
+        <button type="submit">Login</button>
+      </form>
     </div>
   );
 }
