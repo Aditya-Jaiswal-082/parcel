@@ -1,4 +1,4 @@
-const mongoose = require('mongoose'); // ✅ Add this line
+const mongoose = require('mongoose');
 
 const DeliverySchema = new mongoose.Schema({
   userId: {
@@ -8,11 +8,20 @@ const DeliverySchema = new mongoose.Schema({
   },
   pickupAddress: String,
   deliveryAddress: String,
+  pickupLocation: {
+    lat: Number,
+    lng: Number
+  },
+  deliveryLocation: {
+    lat: Number,
+    lng: Number
+  },
   description: String,
   contactNumber: String,
   deliveryDate: Date,
   status: {
     type: String,
+    enum: ['pending', 'assigned', 'completed'], // ✅ fixed capitalization from "Enum" to "enum"
     default: 'pending'
   },
   assignedAgent: {

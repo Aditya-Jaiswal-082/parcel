@@ -9,6 +9,8 @@ import UserDashboard from './pages/UserDashboard';
 import AgentDashboard from './pages/AgentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import Notifications from './pages/Notifications';
+import AdminAssignDelivery from './pages/AdminAssignDelivery';
+import AdminManageUsers from './pages/AdminManageUsers';
 
 function Home() {
   return (
@@ -38,10 +40,10 @@ function Home() {
 function RedirectDashboard() {
   const role = localStorage.getItem('role');
 
-  if (role === 'user') return <Navigate to="./pages/UserDashboard" />;
-  if (role === 'agent') return <Navigate to="./pages/AgentDashboard" />;
-  if (role === 'admin') return <Navigate to="./pages/AdminDashboard" />;
-  // return <Navigate to="/" />;
+  if (role === 'user') return <Navigate to="/UserDashboard" replace />;
+  if (role === 'agent') return <Navigate to="/AgentDashboard" replace />;
+  if (role === 'admin') return <Navigate to="/AdminDashboard" replace />;
+  return <Navigate to="/" replace />;
 }
 
 function App() {
@@ -54,11 +56,13 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/addtocart" element={<AddToCart />} />
         <Route path="/cart" element={<Cart />} />
-        {/* <Route path="/dashboard" element={<RedirectDashboard />} /> */}
+        <Route path="/dashboard" element={<RedirectDashboard />} />
         <Route path="/UserDashboard" element={<UserDashboard />} />
         <Route path="/AgentDashboard" element={<AgentDashboard />} />
         <Route path="/AdminDashboard" element={<AdminDashboard />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/AdminAssignDelivery" element={<AdminAssignDelivery />} />
+        <Route path="/admin/users" element={<AdminManageUsers />} />
       </Routes>
     </Router>
   );

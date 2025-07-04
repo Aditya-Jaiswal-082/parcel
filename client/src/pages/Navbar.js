@@ -14,12 +14,12 @@ function Navbar() {
     navigate('/login');
   };
 
-  const getDashboardRoute = () => {
-    if (role === 'user') return '/dashboard/user';
-    if (role === 'agent') return '/dashboard/agent';
-    if (role === 'admin') return '/dashboard/admin';
-    return '/';
-  };
+  // const getDashboardRoute = () => {
+  //   if (role === 'user') return '/dashboard/user';
+  //   if (role === 'agent') return '/dashboard/agent';
+  //   if (role === 'admin') return '/dashboard/admin';
+  //   return '/';
+  // };
 
   return (
     <nav>
@@ -50,6 +50,8 @@ function Navbar() {
               <Link to="/admin/users">Manage Users</Link> |{' '}
               <Link to="/notifications">Notifications</Link> |{' '}
               <Link to="/AdminDashboard">Admin Dashboard</Link> |{' '}
+              <Link to="/AdminAssignDelivery">Assign Delivery</Link> |{' '}
+              {/* <Link to="/AdminManageUsers">Manage Users</Link> |{' '} */}
             </>
           )}
 

@@ -1,4 +1,3 @@
-// File: server/routes/delivery.js
 const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
@@ -8,29 +7,38 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const sendEmail = require('../utils/sendEmail');
 
-// POST /api/delivery/create
+// ✅ POST /api/delivery/create
 router.post('/create', async (req, res) => {
   try {
-    console.log("📦 Incoming data:", req.body);
-
     const {
       userId,
       pickupAddress,
       deliveryAddress,
       description,
       contactNumber,
-      deliveryDate
+      deliveryDate,
+      pickupCoordinates,
+      deliveryCoordinates
     } = req.body;
 
+    // Validate input
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-      console.error("❌ Invalid or missing userId");
       return res.status(400).json({ error: 'Valid user ID is required' });
     }
+    if (!pickupAddress || !deliveryAddress) {
+      return res.status(400).json({ error: 'Pickup and delivery addresses are required' });
+    }
+    if (!pickupCoordinates || !deliveryCoordinates) {
+      return res.status(400).json({ error: 'Coordinates for both locations are required' });
+    }
 
+    // Create delivery document
     const newDelivery = new Delivery({
       userId,
-      pickupAddress,
+      pickupAddress,              // full text address from Google
       deliveryAddress,
+      pickupLocation: pickupCoordinates,    // { lat, lng }
+      deliveryLocation: deliveryCoordinates,
       description,
       contactNumber,
       deliveryDate
@@ -38,15 +46,17 @@ router.post('/create', async (req, res) => {
 
     await newDelivery.save();
 
-    const agentsAndAdmins = await User.find({ role: { $in: ['admin', 'agent'] } });
+    // Notify all agents and admins
+    const usersToNotify = await User.find({ role: { $in: ['admin', 'agent'] } });
+
     const subject = '📦 New Delivery Created';
     const message = `A new delivery has been created:\nFrom: ${pickupAddress}\nTo: ${deliveryAddress}\nDescription: ${description}`;
 
-    for (const user of agentsAndAdmins) {
+    for (const user of usersToNotify) {
       try {
         await sendEmail(user.email, subject, message);
       } catch (emailErr) {
-        console.error(`❌ Error sending email to ${user.email}:`, emailErr.message);
+        console.error(`❌ Email error to ${user.email}:`, emailErr.message);
       }
 
       const notification = new Notification({
@@ -57,20 +67,63 @@ router.post('/create', async (req, res) => {
       await notification.save();
     }
 
-    console.log(`✅ Notifications sent to ${agentsAndAdmins.length} users`);
-
-    res.status(200).json({ message: 'Delivery created successfully' });
+    res.status(200).json({ message: '✅ Delivery created successfully' });
   } catch (err) {
-    console.error("🔥 Error creating delivery:", err.message);
-    res.status(500).json({ error: err.message || 'Internal server error' });
+    console.error('❌ Error in /create:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// GET /api/delivery/user/:userId
+// ✅ GET unassigned deliveries
+router.get('/unassigned', async (req, res) => {
+  try {
+    const deliveries = await Delivery.find({ assignedAgent: null }).populate('userId', 'name email');
+    res.status(200).json(deliveries);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch unassigned deliveries' });
+  }
+});
+
+// ✅ PATCH assign delivery to agent
+router.patch('/assign/:id', async (req, res) => {
+  try {
+    const { agentId } = req.body;
+    const delivery = await Delivery.findById(req.params.id);
+    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
+    if (delivery.assignedAgent) return res.status(400).json({ error: 'Delivery already assigned' });
+
+    delivery.assignedAgent = agentId;
+    delivery.status = 'assigned';
+    await delivery.save();
+
+    const agent = await User.findById(agentId);
+    const notification = new Notification({
+      userId: agentId,
+      message: `You have been assigned a new delivery from ${delivery.pickupAddress} to ${delivery.deliveryAddress}`
+    });
+
+    await notification.save();
+
+    res.status(200).json({ message: 'Delivery assigned to agent' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to assign delivery' });
+  }
+});
+
+// ✅ GET pending deliveries
+router.get('/pending', async (req, res) => {
+  try {
+    const pendingDeliveries = await Delivery.find({ status: 'pending' });
+    res.status(200).json(pendingDeliveries);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ✅ GET deliveries by user
 router.get('/user/:userId', async (req, res) => {
   const { userId } = req.params;
-
-  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
     return res.status(400).json({ error: 'Valid user ID required' });
   }
 
@@ -78,12 +131,11 @@ router.get('/user/:userId', async (req, res) => {
     const deliveries = await Delivery.find({ userId }).sort({ createdAt: -1 });
     res.status(200).json(deliveries);
   } catch (err) {
-    console.error("❌ Error fetching deliveries:", err.message);
     res.status(500).json({ error: 'Failed to fetch deliveries' });
   }
 });
 
-// GET /api/delivery/all
+// ✅ GET all deliveries
 router.get('/all', async (req, res) => {
   try {
     const deliveries = await Delivery.find()
@@ -91,27 +143,13 @@ router.get('/all', async (req, res) => {
       .populate('assignedAgent', 'name email');
     res.status(200).json(deliveries);
   } catch (err) {
-    console.error("❌ Error fetching deliveries:", err.message);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// GET /api/delivery/unassigned
-router.get('/unassigned', async (req, res) => {
-  try {
-    const deliveries = await Delivery.find({ assignedAgent: null })
-      .populate('userId', 'name email');
-    res.status(200).json(deliveries);
-  } catch (err) {
-    console.error("❌ Error fetching unassigned deliveries:", err.message);
-    res.status(500).json({ error: 'Failed to fetch deliveries' });
-  }
-});
-
-// GET /api/delivery/assigned/:agentId
+// ✅ GET deliveries assigned to a specific agent
 router.get('/assigned/:agentId', async (req, res) => {
   const { agentId } = req.params;
-
   if (!mongoose.Types.ObjectId.isValid(agentId)) {
     return res.status(400).json({ error: 'Invalid agent ID' });
   }
@@ -123,17 +161,14 @@ router.get('/assigned/:agentId', async (req, res) => {
 
     res.status(200).json(deliveries);
   } catch (err) {
-    console.error('❌ Error fetching assigned deliveries:', err.message);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// PATCH /api/delivery/complete/:id - mark delivery as completed
+// ✅ PATCH mark delivery as completed
 router.patch('/complete/:id', async (req, res) => {
   try {
-    const deliveryId = req.params.id;
-
-    const delivery = await Delivery.findById(deliveryId);
+    const delivery = await Delivery.findById(req.params.id);
     if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
 
     if (delivery.status !== 'assigned') {
@@ -145,23 +180,18 @@ router.patch('/complete/:id', async (req, res) => {
 
     res.status(200).json({ message: 'Delivery marked as completed' });
   } catch (err) {
-    console.error("❌ Completion error:", err.message);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-
-// PATCH /api/delivery/claim/:id
+// ✅ PATCH allow agents to claim delivery
 router.patch('/claim/:id', async (req, res) => {
   try {
-    const deliveryId = req.params.id;
-    const agentId = req.body.agentId;
+    const { agentId } = req.body;
+    const delivery = await Delivery.findById(req.params.id);
 
-    const delivery = await Delivery.findById(deliveryId);
     if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
-
-    if (delivery.assignedAgent)
-      return res.status(400).json({ error: 'Delivery already assigned' });
+    if (delivery.assignedAgent) return res.status(400).json({ error: 'Delivery already assigned' });
 
     delivery.assignedAgent = agentId;
     delivery.status = 'assigned';
@@ -169,11 +199,8 @@ router.patch('/claim/:id', async (req, res) => {
 
     res.status(200).json({ message: 'Delivery successfully claimed' });
   } catch (err) {
-    console.error("❌ Claim error:", err.message);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 module.exports = router;
-
-
