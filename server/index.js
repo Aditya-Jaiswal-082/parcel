@@ -40,3 +40,4 @@ app.use('/api/delivery', require('./routes/delivery'));
 const adminRoutes = require('./routes/admin');
 app.use('/api/admin', adminRoutes);
 
+app.use('/api', require('./routes/distance'));
