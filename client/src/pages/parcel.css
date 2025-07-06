@@ -82,3 +82,17 @@ h1, h2, h3 {
   margin-bottom: 20px;
   box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
+
+.delivery-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+.delivery-table th,
+.delivery-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+.delivery-table th {
+  background-color: #f0f0f0;
+}

@@ -19,17 +19,8 @@ Manual override: admin can assign, reassign, or cancel
 
 🔹 Updated User Journey Flow
 🧍 User:
-mathematica
-Copy
-Edit
 Login → Book Parcel → Enter Pickup/Drop → Confirm → Real-Time Tracking → Payment → Review
 🛵 Agent:
-pgsql
-Copy
-Edit
 Login → Get Notified of New Order → View Details → Accept or Ignore → Navigate → Pickup → Deliver → Mark Complete
 🧑‍💼 Admin:
-pgsql
-Copy
-Edit
 Login → View All Orders (Pending/Accepted/Completed) → Assign or Reassign Orders → Add/Edit Agents → Analytics & Earnings

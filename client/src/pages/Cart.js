@@ -1,4 +1,3 @@
-// File: src/pages/Cart.js
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
@@ -31,14 +30,30 @@ function Cart() {
       {deliveries.length === 0 ? (
         <p>No deliveries yet.</p>
       ) : (
-        <ul>
-          {deliveries.map((d, i) => (
-            <li key={i}>
-              <strong>From:</strong> {d.pickupAddress} | <strong>To:</strong> {d.deliveryAddress} <br />
-              <strong>Status:</strong> {d.status} | <strong>Date:</strong> {new Date(d.createdAt).toLocaleString()}
-            </li>
-          ))}
-        </ul>
+        <table className="delivery-table">
+          <thead>
+            <tr>
+              <th>Tracking ID</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Price</th>
+              <th>Status</th>
+              <th>Delivery Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {deliveries.map((d, i) => (
+              <tr key={i}>
+                <td>{d.trackingId}</td>
+                <td>{d.pickupAddress}</td>
+                <td>{d.deliveryAddress}</td>
+                <td>₹{d.price}</td>
+                <td style={{ textTransform: 'capitalize' }}>{d.status}</td>
+                <td>{new Date(d.deliveryDate).toLocaleDateString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

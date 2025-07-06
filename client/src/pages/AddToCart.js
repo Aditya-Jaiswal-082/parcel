@@ -9,24 +9,27 @@ function AddToCart() {
     contactNumber: '',
     deliveryDate: '',
     pickupCoordinates: null,
-    deliveryCoordinates: null
+    deliveryCoordinates: null,
+    additionalInfoPickup: '',
+    additionalInfoDelivery: ''
   });
 
   const [userId, setUserId] = useState(null);
-  const [price, setPrice] = useState(null);
-  const [distanceKm, setDistanceKm] = useState(null);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState({ pickup: [], delivery: [] });
   const pickupRef = useRef(null);
   const deliveryRef = useRef(null);
   const navigate = useNavigate();
-
-  const RATE_PER_KM = 10;
-  const BASE_PRICE = 20;
 
   useEffect(() => {
     const id = localStorage.getItem('userId');
     if (id) setUserId(id);
     else alert('User not logged in. Please log in first.');
+
+    const saved = JSON.parse(localStorage.getItem('savedAddresses') || '{}');
+    setSavedAddresses({
+      pickup: saved.pickup || [],
+      delivery: saved.delivery || []
+    });
   }, []);
 
   useEffect(() => {
@@ -53,7 +56,7 @@ function AddToCart() {
           return;
         }
 
-        const fullAddress = place.formatted_address || place.name;
+        const fullAddress = place.formatted_address;
         const coordinates = {
           lat: place.geometry.location.lat(),
           lng: place.geometry.location.lng()
@@ -86,70 +89,44 @@ function AddToCart() {
     loadGoogleMapsScript();
   }, []);
 
-  useEffect(() => {
-    const calculateDistance = () => {
-      if (
-        formData.pickupCoordinates &&
-        formData.deliveryCoordinates &&
-        window.google?.maps?.DistanceMatrixService
-      ) {
-        const service = new window.google.maps.DistanceMatrixService();
-
-        service.getDistanceMatrix(
-          {
-            origins: [
-              new window.google.maps.LatLng(
-                formData.pickupCoordinates.lat,
-                formData.pickupCoordinates.lng
-              )
-            ],
-            destinations: [
-              new window.google.maps.LatLng(
-                formData.deliveryCoordinates.lat,
-                formData.deliveryCoordinates.lng
-              )
-            ],
-            travelMode: 'DRIVING'
-          },
-          (response, status) => {
-            if (status === 'OK') {
-              const distanceInMeters = response.rows[0].elements[0].distance.value;
-              const distanceInKm = distanceInMeters / 1000;
-              const finalPrice = BASE_PRICE + distanceInKm * RATE_PER_KM;
-
-              setDistanceKm(distanceInKm.toFixed(2));
-              setPrice(finalPrice.toFixed(2));
-              setShowConfirm(true);
-            } else {
-              console.error('Distance matrix error:', status);
-              alert('Could not calculate distance. Try again.');
-            }
-          }
-        );
-      }
-    };
-
-    calculateDistance();
-  }, [formData.pickupCoordinates, formData.deliveryCoordinates]);
-
   const handleChange = e => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleSavedAddressSelect = (type, index) => {
+    const selected = savedAddresses[type][index];
+    if (selected) {
+      setFormData(prev => ({
+        ...prev,
+        [`${type}Address`]: selected.address,
+        [`${type}Coordinates`]: selected.coordinates
+      }));
+    }
+  };
+
+  const saveAddressToLocalStorage = (type, label) => {
+    const newEntry = {
+      label,
+      address: formData[`${type}Address`],
+      coordinates: formData[`${type}Coordinates`]
+    };
+
+    const updated = { ...savedAddresses };
+    updated[type].push(newEntry);
+    setSavedAddresses(updated);
+    localStorage.setItem('savedAddresses', JSON.stringify(updated));
+  };
+
   const handleNext = e => {
     e.preventDefault();
+
     if (!formData.pickupCoordinates || !formData.deliveryCoordinates) {
       alert('Please select both pickup and delivery addresses.');
       return;
     }
-    // Triggered by useEffect
+
+    navigate('/payment', { state: { ...formData, userId } });
   };
-
-  const handleConfirm = () => {
-  setShowConfirm(false);
-  navigate('/payment', { state: { ...formData, price, userId } });
-};
-
 
   return (
     <div className="container">
@@ -164,6 +141,25 @@ function AddToCart() {
           onChange={handleChange}
           required
         />
+        <input
+          type="text"
+          name="additionalInfoPickup"
+          placeholder="Flat/Room No, Landmark, etc."
+          value={formData.additionalInfoPickup}
+          onChange={handleChange}
+        />
+        <button type="button" onClick={() => {
+          const label = prompt("Give a label (e.g., Home, Work):");
+          if (label) saveAddressToLocalStorage('pickup', label);
+        }}>
+          💾 Save Pickup Address
+        </button>
+        <select onChange={e => handleSavedAddressSelect('pickup', e.target.value)}>
+          <option value="">-- Select Saved Pickup --</option>
+          {savedAddresses.pickup.map((addr, i) => (
+            <option key={i} value={i}>{addr.label}</option>
+          ))}
+        </select>
 
         <label>Delivery Address</label>
         <input
@@ -174,6 +170,25 @@ function AddToCart() {
           onChange={handleChange}
           required
         />
+        <input
+          type="text"
+          name="additionalInfoDelivery"
+          placeholder="Flat/Room No, Landmark, etc."
+          value={formData.additionalInfoDelivery}
+          onChange={handleChange}
+        />
+        <button type="button" onClick={() => {
+          const label = prompt("Give a label (e.g., Friend, Mom):");
+          if (label) saveAddressToLocalStorage('delivery', label);
+        }}>
+          💾 Save Delivery Address
+        </button>
+        <select onChange={e => handleSavedAddressSelect('delivery', e.target.value)}>
+          <option value="">-- Select Saved Delivery --</option>
+          {savedAddresses.delivery.map((addr, i) => (
+            <option key={i} value={i}>{addr.label}</option>
+          ))}
+        </select>
 
         <label>Parcel Description</label>
         <input
@@ -199,22 +214,11 @@ function AddToCart() {
           name="deliveryDate"
           value={formData.deliveryDate}
           onChange={handleChange}
+          required
         />
 
         <button type="submit">Next</button>
       </form>
-
-      {showConfirm && (
-        <div className="modal">
-          <div className="modal-content">
-            <h3>Confirm Order</h3>
-            <p>Estimated Distance: {distanceKm} km</p>
-            <p>Total Price: ₹{price}</p>
-            <button onClick={handleConfirm}>Proceed to Payment</button>
-            <button onClick={() => setShowConfirm(false)}>Cancel</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

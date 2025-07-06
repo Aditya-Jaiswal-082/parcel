@@ -19,9 +19,18 @@ const DeliverySchema = new mongoose.Schema({
   description: String,
   contactNumber: String,
   deliveryDate: Date,
+  price: Number,
+
+  // ✅ NEW: Tracking ID
+  trackingId: {
+    type: String,
+    required: true,
+    unique: true
+  },
+
   status: {
     type: String,
-    enum: ['pending', 'assigned', 'completed'], // ✅ fixed capitalization from "Enum" to "enum"
+    enum: ['pending', 'assigned', 'completed'],
     default: 'pending'
   },
   assignedAgent: {

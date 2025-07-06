@@ -7,6 +7,14 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const sendEmail = require('../utils/sendEmail');
 
+// Generate a unique tracking ID
+const generateTrackingId = () => {
+  const prefix = 'TRK';
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const timestamp = Date.now().toString().slice(-5);
+  return `${prefix}-${random}-${timestamp}`;
+};
+
 // ✅ POST /api/delivery/create
 router.post('/create', async (req, res) => {
   try {
@@ -22,9 +30,11 @@ router.post('/create', async (req, res) => {
       price
     } = req.body;
 
-    // Validate input
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ error: 'Valid user ID is required' });
+    }
+    if (pickupAddress.length < 10 || deliveryAddress.length < 10) {
+      return res.status(400).json({ error: 'Address too short. Please enter a valid full address.' });
     }
     if (!pickupAddress || !deliveryAddress) {
       return res.status(400).json({ error: 'Pickup and delivery addresses are required' });
@@ -33,10 +43,8 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ error: 'Coordinates for both locations are required' });
     }
 
-    // Generate a unique tracking ID
-    const trackingId = 'TRK' + Date.now();
+    const trackingId = generateTrackingId();
 
-    // Create delivery document
     const newDelivery = new Delivery({
       userId,
       pickupAddress,
@@ -59,7 +67,6 @@ router.post('/create', async (req, res) => {
 
     await newDelivery.save();
 
-    // Notify all agents and admins
     const usersToNotify = await User.find({ role: { $in: ['admin', 'agent'] } });
 
     const subject = '📦 New Delivery Created';
@@ -113,10 +120,12 @@ router.get('/unassigned', async (req, res) => {
   }
 });
 
-// ✅ PATCH assign delivery to agent
-router.patch('/assign/:id', async (req, res) => {
+// ✅ PATCH assign delivery to agent (Admin)
+router.post('/assign/:id', async (req, res) => {
   try {
     const { agentId } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(agentId)) return res.status(400).json({ error: 'Invalid agent ID' });
+
     const delivery = await Delivery.findById(req.params.id);
     if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
     if (delivery.assignedAgent) return res.status(400).json({ error: 'Delivery already assigned' });
@@ -129,14 +138,44 @@ router.patch('/assign/:id', async (req, res) => {
     const agent = await User.findById(agentId);
     const notification = new Notification({
       userId: agentId,
-      message: `You have been assigned a new delivery from ${delivery.pickupAddress} to ${delivery.deliveryAddress}`
+      message: `📦 You have been assigned a new delivery: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`
     });
 
     await notification.save();
 
-    res.status(200).json({ message: 'Delivery assigned to agent' });
+    res.status(200).json({ message: '✅ Delivery assigned to agent' });
   } catch (err) {
+    console.error('❌ Error in assigning delivery:', err.message);
     res.status(500).json({ error: 'Failed to assign delivery' });
+  }
+});
+
+// ✅ PATCH agent claims delivery
+router.patch('/claim/:id', async (req, res) => {
+  try {
+    const { agentId } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(agentId)) return res.status(400).json({ error: 'Invalid agent ID' });
+
+    const delivery = await Delivery.findById(req.params.id);
+    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
+    if (delivery.assignedAgent) return res.status(400).json({ error: 'Delivery already assigned' });
+
+    delivery.assignedAgent = agentId;
+    delivery.status = 'assigned';
+    delivery.statusUpdates.push({ status: 'assigned', timestamp: new Date() });
+    await delivery.save();
+
+    const notification = new Notification({
+      userId: agentId,
+      message: `📦 You claimed a delivery from ${delivery.pickupAddress} to ${delivery.deliveryAddress}`
+    });
+
+    await notification.save();
+
+    res.status(200).json({ message: '✅ Delivery successfully claimed' });
+  } catch (err) {
+    console.error('❌ Error in claiming delivery:', err.message);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -209,27 +248,7 @@ router.patch('/complete/:id', async (req, res) => {
     delivery.statusUpdates.push({ status: 'completed', timestamp: new Date() });
     await delivery.save();
 
-    res.status(200).json({ message: 'Delivery marked as completed' });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// ✅ PATCH allow agents to claim delivery
-router.patch('/claim/:id', async (req, res) => {
-  try {
-    const { agentId } = req.body;
-    const delivery = await Delivery.findById(req.params.id);
-
-    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
-    if (delivery.assignedAgent) return res.status(400).json({ error: 'Delivery already assigned' });
-
-    delivery.assignedAgent = agentId;
-    delivery.status = 'assigned';
-    delivery.statusUpdates.push({ status: 'assigned', timestamp: new Date() });
-    await delivery.save();
-
-    res.status(200).json({ message: 'Delivery successfully claimed' });
+    res.status(200).json({ message: '✅ Delivery marked as completed' });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
