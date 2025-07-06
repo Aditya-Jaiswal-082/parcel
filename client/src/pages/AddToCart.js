@@ -146,9 +146,10 @@ function AddToCart() {
   };
 
   const handleConfirm = () => {
-    setShowConfirm(false);
-    navigate('/payment', { state: { ...formData, price } });
-  };
+  setShowConfirm(false);
+  navigate('/payment', { state: { ...formData, price, userId } });
+};
+
 
   return (
     <div className="container">

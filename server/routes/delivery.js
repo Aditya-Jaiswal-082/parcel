@@ -18,7 +18,9 @@ router.post('/create', async (req, res) => {
       contactNumber,
       deliveryDate,
       pickupCoordinates,
-      deliveryCoordinates
+      deliveryCoordinates,
+      price,
+      
     } = req.body;
 
     // Validate input
@@ -41,7 +43,8 @@ router.post('/create', async (req, res) => {
       deliveryLocation: deliveryCoordinates,
       description,
       contactNumber,
-      deliveryDate
+      deliveryDate,
+      price
     });
 
     await newDelivery.save();

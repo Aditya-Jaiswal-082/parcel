@@ -11,6 +11,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import Notifications from './pages/Notifications';
 import AdminAssignDelivery from './pages/AdminAssignDelivery';
 import AdminManageUsers from './pages/AdminManageUsers';
+import Payment from './pages/payments';
 
 function Home() {
   return (
@@ -63,6 +64,7 @@ function App() {
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/AdminAssignDelivery" element={<AdminAssignDelivery />} />
         <Route path="/admin/users" element={<AdminManageUsers />} />
+        <Route path="/payment" element={<Payment />} />
       </Routes>
     </Router>
   );
