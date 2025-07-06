@@ -19,8 +19,7 @@ router.post('/create', async (req, res) => {
       deliveryDate,
       pickupCoordinates,
       deliveryCoordinates,
-      price,
-      
+      price
     } = req.body;
 
     // Validate input
@@ -34,17 +33,28 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ error: 'Coordinates for both locations are required' });
     }
 
+    // Generate a unique tracking ID
+    const trackingId = 'TRK' + Date.now();
+
     // Create delivery document
     const newDelivery = new Delivery({
       userId,
-      pickupAddress,              // full text address from Google
+      pickupAddress,
       deliveryAddress,
-      pickupLocation: pickupCoordinates,    // { lat, lng }
+      pickupLocation: pickupCoordinates,
       deliveryLocation: deliveryCoordinates,
       description,
       contactNumber,
       deliveryDate,
-      price
+      price,
+      trackingId,
+      status: 'pending',
+      statusUpdates: [
+        {
+          status: 'pending',
+          timestamp: new Date()
+        }
+      ]
     });
 
     await newDelivery.save();
@@ -70,10 +80,26 @@ router.post('/create', async (req, res) => {
       await notification.save();
     }
 
-    res.status(200).json({ message: '✅ Delivery created successfully' });
+    res.status(201).json({ message: '✅ Delivery created successfully', trackingId });
   } catch (err) {
     console.error('❌ Error in /create:', err.message);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ✅ GET delivery by tracking ID
+router.get('/track/:trackingId', async (req, res) => {
+  try {
+    const delivery = await Delivery.findOne({ trackingId: req.params.trackingId })
+      .populate('userId', 'name email')
+      .populate('assignedAgent', 'name email');
+
+    if (!delivery) return res.status(404).json({ error: 'Tracking ID not found' });
+
+    res.status(200).json(delivery);
+  } catch (err) {
+    console.error('Error in tracking:', err.message);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -97,6 +123,7 @@ router.patch('/assign/:id', async (req, res) => {
 
     delivery.assignedAgent = agentId;
     delivery.status = 'assigned';
+    delivery.statusUpdates.push({ status: 'assigned', timestamp: new Date() });
     await delivery.save();
 
     const agent = await User.findById(agentId);
@@ -179,6 +206,7 @@ router.patch('/complete/:id', async (req, res) => {
     }
 
     delivery.status = 'completed';
+    delivery.statusUpdates.push({ status: 'completed', timestamp: new Date() });
     await delivery.save();
 
     res.status(200).json({ message: 'Delivery marked as completed' });
@@ -198,6 +226,7 @@ router.patch('/claim/:id', async (req, res) => {
 
     delivery.assignedAgent = agentId;
     delivery.status = 'assigned';
+    delivery.statusUpdates.push({ status: 'assigned', timestamp: new Date() });
     await delivery.save();
 
     res.status(200).json({ message: 'Delivery successfully claimed' });
