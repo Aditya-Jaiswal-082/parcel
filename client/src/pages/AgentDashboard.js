@@ -1,4 +1,4 @@
-// File: src/AgentDashboard.js
+// ✅ UPDATED AgentDashboard.js
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
@@ -37,7 +37,11 @@ function AgentDashboard() {
 
   const handleClaim = async (deliveryId) => {
     try {
-      await axios.patch(`http://localhost:5000/api/delivery/claim/${deliveryId}`, { agentId });
+      await axios.patch(`http://localhost:5000/api/delivery/claim/${deliveryId}`, {
+        agentId
+      }, {
+        headers: { 'Content-Type': 'application/json' }
+      });
       alert('Delivery claimed!');
       fetchUnassignedDeliveries();
       fetchAssignedDeliveries();
@@ -46,17 +50,26 @@ function AgentDashboard() {
     }
   };
 
-  const completeDelivery = async (deliveryId) => {
+  const updateStatus = async (deliveryId, newStatus) => {
     try {
-      const res = await axios.patch(`http://localhost:5000/api/delivery/complete/${deliveryId}`, null, {
-        headers: { Authorization: `Bearer ${token}` }
+      await axios.patch(`http://localhost:5000/api/delivery/update-status/${deliveryId}`, {
+        newStatus
+      }, {
+        headers: { 'Content-Type': 'application/json' }
       });
-      alert(res.data.message);
+      alert(`Status updated to ${newStatus}`);
       fetchAssignedDeliveries();
     } catch (err) {
-      console.error('Error completing delivery:', err.response?.data || err.message);
-      alert('Failed to complete delivery');
+      console.error('Error updating status:', err.response?.data || err.message);
+      alert('Failed to update status');
     }
+  };
+
+  const nextStatus = {
+    'assigned': 'onpickup',
+    'onpickup': 'payment done',
+    'payment done': 'in progress',
+    'in progress': 'delivered'
   };
 
   return (
@@ -84,8 +97,10 @@ function AgentDashboard() {
             <p><strong>From:</strong> {d.pickupAddress}</p>
             <p><strong>To:</strong> {d.deliveryAddress}</p>
             <p><strong>Status:</strong> {d.status}</p>
-            {d.status === 'assigned' && (
-              <button onClick={() => completeDelivery(d._id)}>Mark as Completed</button>
+            {nextStatus[d.status] && (
+              <button onClick={() => updateStatus(d._id, nextStatus[d.status])}>
+                Mark as {nextStatus[d.status]}
+              </button>
             )}
           </div>
         ))

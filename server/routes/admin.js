@@ -4,7 +4,15 @@ const router = express.Router();
 const User = require('../models/User');
 const Delivery = require('../models/Delivery');
 const Notification = require('../models/Notification');
-const sendEmail = require('../utils/sendEmail'); // ✅ Make sure this exists
+const sendEmail = require('../utils/sendEmail');
+
+// Generate a unique tracking ID
+const generateTrackingId = () => {
+  const prefix = 'TRK';
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const timestamp = Date.now().toString().slice(-5);
+  return `${prefix}-${random}-${timestamp}`;
+};
 
 // ✅ GET all users
 router.get('/users', async (req, res) => {
@@ -28,7 +36,7 @@ router.get('/agents', async (req, res) => {
   }
 });
 
-// ✅ ASSIGN delivery to agent
+// ✅ ASSIGN delivery to agent (Fixed trackingId issue)
 router.patch('/assign-delivery/:deliveryId', async (req, res) => {
   const { deliveryId } = req.params;
   const { agentId } = req.body;
@@ -41,10 +49,24 @@ router.patch('/assign-delivery/:deliveryId', async (req, res) => {
       return res.status(400).json({ error: 'Delivery already assigned' });
     }
 
+    // 🔒 Validate required fields before saving
+    if (!delivery.pickupAddress || !delivery.deliveryAddress || !delivery.contactNumber) {
+      return res.status(400).json({ error: 'Delivery missing required details' });
+    }
+
+    // ✅ Fix missing tracking ID if it wasn't generated properly
+    if (!delivery.trackingId) {
+      delivery.trackingId = generateTrackingId();
+      console.warn(`⚠️ Assigned new trackingId to delivery: ${delivery.trackingId}`);
+    }
+
     delivery.assignedAgent = agentId;
     delivery.status = 'assigned';
+    delivery.statusUpdates.push({ status: 'assigned', timestamp: new Date() });
+
     await delivery.save();
 
+    // Notify agent
     const notification = new Notification({
       userId: agentId,
       message: `You have been assigned a delivery from ${delivery.pickupAddress} to ${delivery.deliveryAddress}`
@@ -54,11 +76,11 @@ router.patch('/assign-delivery/:deliveryId', async (req, res) => {
     res.status(200).json({ message: '✅ Delivery assigned to agent successfully' });
   } catch (err) {
     console.error('❌ Admin assign error:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error during assignment' });
   }
 });
 
-// ✅ UPDATE user info or role + send notifications and emails
+// ✅ UPDATE user info or role
 router.patch('/user/:id', async (req, res) => {
   const { name, email, role } = req.body;
 
@@ -83,35 +105,28 @@ router.patch('/user/:id', async (req, res) => {
 
     await user.save();
 
-    // 🔔 Notify and email if role changed
     if (roleChanged) {
       const messageToUser = `Your role has been changed from ${previousRole} to ${role}`;
       const subjectToUser = '🛂 Your Role Has Been Updated';
 
-      // Save in-app notification
       await new Notification({ userId: user._id, message: messageToUser }).save();
 
-      // Send email to user
       try {
         await sendEmail(user.email, subjectToUser, messageToUser);
       } catch (err) {
         console.error(`❌ Failed to send role change email to ${user.email}:`, err.message);
       }
 
-      // Notify all admins
       const admins = await User.find({ role: 'admin' });
       const messageToAdmins = `User ${user.name} (${user.email}) role changed from ${previousRole} to ${role}`;
       const subjectToAdmins = '👤 User Role Updated';
 
       for (const admin of admins) {
-        // Save notification
         await new Notification({ userId: admin._id, message: messageToAdmins }).save();
-
-        // Send email to admin
         try {
           await sendEmail(admin.email, subjectToAdmins, messageToAdmins);
         } catch (err) {
-          console.error(`❌ Failed to send role change email to admin ${admin.email}:`, err.message);
+          console.error(`❌ Failed to email admin ${admin.email}:`, err.message);
         }
       }
     }

@@ -7,7 +7,6 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const sendEmail = require('../utils/sendEmail');
 
-// Generate a unique tracking ID
 const generateTrackingId = () => {
   const prefix = 'TRK';
   const random = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -56,10 +55,10 @@ router.post('/create', async (req, res) => {
       deliveryDate,
       price,
       trackingId,
-      status: 'pending',
+      status: 'created',
       statusUpdates: [
         {
-          status: 'pending',
+          status: 'created',
           timestamp: new Date()
         }
       ]
@@ -94,7 +93,6 @@ router.post('/create', async (req, res) => {
   }
 });
 
-// ✅ GET delivery by tracking ID
 router.get('/track/:trackingId', async (req, res) => {
   try {
     const delivery = await Delivery.findOne({ trackingId: req.params.trackingId })
@@ -110,7 +108,6 @@ router.get('/track/:trackingId', async (req, res) => {
   }
 });
 
-// ✅ GET unassigned deliveries
 router.get('/unassigned', async (req, res) => {
   try {
     const deliveries = await Delivery.find({ assignedAgent: null }).populate('userId', 'name email');
@@ -120,7 +117,6 @@ router.get('/unassigned', async (req, res) => {
   }
 });
 
-// ✅ PATCH assign delivery to agent (Admin)
 router.post('/assign/:id', async (req, res) => {
   try {
     const { agentId } = req.body;
@@ -135,7 +131,6 @@ router.post('/assign/:id', async (req, res) => {
     delivery.statusUpdates.push({ status: 'assigned', timestamp: new Date() });
     await delivery.save();
 
-    const agent = await User.findById(agentId);
     const notification = new Notification({
       userId: agentId,
       message: `📦 You have been assigned a new delivery: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`
@@ -150,7 +145,6 @@ router.post('/assign/:id', async (req, res) => {
   }
 });
 
-// ✅ PATCH agent claims delivery
 router.patch('/claim/:id', async (req, res) => {
   try {
     const { agentId } = req.body;
@@ -179,7 +173,28 @@ router.patch('/claim/:id', async (req, res) => {
   }
 });
 
-// ✅ GET pending deliveries
+// ✅ PATCH /api/delivery/update-status/:id — update delivery status with tracking
+router.patch('/update-status/:id', async (req, res) => {
+  const { id } = req.params;
+  const { newStatus } = req.body;
+
+  if (!newStatus) return res.status(400).json({ error: 'New status is required' });
+
+  try {
+    const delivery = await Delivery.findById(id);
+    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
+
+    delivery.status = newStatus;
+    delivery.statusUpdates.push({ status: newStatus, timestamp: new Date() });
+    await delivery.save();
+
+    res.status(200).json({ message: `Status updated to ${newStatus}` });
+  } catch (err) {
+    console.error('Error updating status:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.get('/pending', async (req, res) => {
   try {
     const pendingDeliveries = await Delivery.find({ status: 'pending' });
@@ -189,7 +204,6 @@ router.get('/pending', async (req, res) => {
   }
 });
 
-// ✅ GET deliveries by user
 router.get('/user/:userId', async (req, res) => {
   const { userId } = req.params;
   if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -204,7 +218,6 @@ router.get('/user/:userId', async (req, res) => {
   }
 });
 
-// ✅ GET all deliveries
 router.get('/all', async (req, res) => {
   try {
     const deliveries = await Delivery.find()
@@ -216,7 +229,6 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// ✅ GET deliveries assigned to a specific agent
 router.get('/assigned/:agentId', async (req, res) => {
   const { agentId } = req.params;
   if (!mongoose.Types.ObjectId.isValid(agentId)) {
@@ -234,21 +246,16 @@ router.get('/assigned/:agentId', async (req, res) => {
   }
 });
 
-// ✅ PATCH mark delivery as completed
 router.patch('/complete/:id', async (req, res) => {
   try {
     const delivery = await Delivery.findById(req.params.id);
     if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
 
-    if (delivery.status !== 'assigned') {
-      return res.status(400).json({ error: 'Only assigned deliveries can be completed' });
-    }
-
-    delivery.status = 'completed';
-    delivery.statusUpdates.push({ status: 'completed', timestamp: new Date() });
+    delivery.status = 'delivered';
+    delivery.statusUpdates.push({ status: 'delivered', timestamp: new Date() });
     await delivery.save();
 
-    res.status(200).json({ message: '✅ Delivery marked as completed' });
+    res.status(200).json({ message: '✅ Delivery marked as delivered' });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }

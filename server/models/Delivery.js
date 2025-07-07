@@ -1,5 +1,23 @@
 const mongoose = require('mongoose');
 
+const StatusUpdateSchema = new mongoose.Schema({
+  status: {
+    type: String,
+    enum: [
+      'created',
+      'assigned',
+      'onpickup',
+      'payment done',
+      'in progress',
+      'delivered'
+    ]
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now
+  }
+});
+
 const DeliverySchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -21,7 +39,6 @@ const DeliverySchema = new mongoose.Schema({
   deliveryDate: Date,
   price: Number,
 
-  // ✅ NEW: Tracking ID
   trackingId: {
     type: String,
     required: true,
@@ -30,14 +47,25 @@ const DeliverySchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ['pending', 'assigned', 'completed'],
-    default: 'pending'
+    enum: [
+      'created',
+      'assigned',
+      'onpickup',
+      'payment done',
+      'in progress',
+      'delivered'
+    ],
+    default: 'created'
   },
+
+  statusUpdates: [StatusUpdateSchema],
+
   assignedAgent: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     default: null
   },
+
   createdAt: {
     type: Date,
     default: Date.now
