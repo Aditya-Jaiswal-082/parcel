@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import './parcel.css'; 
 
 function Signup() {
   const [name, setName] = useState('');
