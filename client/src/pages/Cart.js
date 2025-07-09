@@ -4,25 +4,47 @@ import axios from 'axios';
 function Cart() {
   const [deliveries, setDeliveries] = useState([]);
 
+  const userId = localStorage.getItem('userId');
+  const token = localStorage.getItem('token');
+
+  const fetchDeliveries = async () => {
+    try {
+      const res = await axios.get(`http://localhost:5000/api/delivery/user/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setDeliveries(res.data);
+    } catch (err) {
+      console.error("Error loading deliveries:", err);
+    }
+  };
+
   useEffect(() => {
-    const userId = localStorage.getItem('userId');
-    const token = localStorage.getItem('token');
+    if (userId && token) {
+      fetchDeliveries();
+    }
+  }, [userId, token]);
 
-    if (!userId || !token) return;
+  const handleCancel = async (id, trackingId) => {
+    const confirmCancel = window.confirm(
+      `Are you sure you want to cancel this delivery?\nTracking ID: ${trackingId}`
+    );
 
-    const fetchDeliveries = async () => {
-      try {
-        const res = await axios.get(`http://localhost:5000/api/delivery/user/${userId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setDeliveries(res.data);
-      } catch (err) {
-        console.error("Error loading deliveries:", err);
-      }
-    };
+    if (!confirmCancel) return;
 
-    fetchDeliveries();
-  }, []);
+    try {
+      await axios.patch(`http://localhost:5000/api/delivery/cancel/${id}`, {
+        cancelledBy: 'user'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      alert('✅ Delivery cancelled. You will receive a confirmation email.');
+      fetchDeliveries(); // refresh list
+    } catch (err) {
+      console.error("Error cancelling delivery:", err);
+      alert('❌ Could not cancel delivery.');
+    }
+  };
 
   return (
     <div className="container">
@@ -39,6 +61,7 @@ function Cart() {
               <th>Price</th>
               <th>Status</th>
               <th>Delivery Date</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -50,6 +73,15 @@ function Cart() {
                 <td>₹{d.price}</td>
                 <td style={{ textTransform: 'capitalize' }}>{d.status}</td>
                 <td>{new Date(d.deliveryDate).toLocaleDateString()}</td>
+                <td>
+                  {(d.status !== 'cancelled' && d.status !== 'delivered') ? (
+                    <button onClick={() => handleCancel(d._id, d.trackingId)}>
+                      Cancel
+                    </button>
+                  ) : (
+                    <span style={{ color: 'gray' }}>N/A</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

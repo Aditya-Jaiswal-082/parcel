@@ -26,11 +26,7 @@ function Login() {
       localStorage.setItem('userId', userId);
 
       alert('Login successful');
-
-      // ✅ Redirect based on role
-      if (role === 'admin') navigate('/dashboard/admin');
-      else if (role === 'agent') navigate('/dashboard/agent');
-      else navigate('/dashboard/user');
+      navigate('/UserDashboard');
 
     } catch (err) {
       console.error('🔥 Login error:', err.response?.data || err.message);

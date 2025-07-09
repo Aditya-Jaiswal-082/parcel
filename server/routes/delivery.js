@@ -173,7 +173,6 @@ router.patch('/claim/:id', async (req, res) => {
   }
 });
 
-// ✅ PATCH /api/delivery/update-status/:id — update delivery status with tracking
 router.patch('/update-status/:id', async (req, res) => {
   const { id } = req.params;
   const { newStatus } = req.body;
@@ -191,6 +190,40 @@ router.patch('/update-status/:id', async (req, res) => {
     res.status(200).json({ message: `Status updated to ${newStatus}` });
   } catch (err) {
     console.error('Error updating status:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.patch('/cancel/:id', async (req, res) => {
+  try {
+    const { cancelledBy } = req.body;
+
+    if (!cancelledBy || !['user', 'admin'].includes(cancelledBy)) {
+      return res.status(400).json({ error: 'Invalid cancelledBy value (should be user or admin)' });
+    }
+
+    const delivery = await Delivery.findById(req.params.id);
+    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
+
+    if (delivery.status === 'cancelled' || delivery.status === 'delivered') {
+      return res.status(400).json({ error: 'Cannot cancel a delivered or already cancelled order' });
+    }
+
+    delivery.status = 'cancelled';
+    delivery.statusUpdates.push({ status: 'cancelled', timestamp: new Date(), cancelledBy });
+    await delivery.save();
+
+    if (delivery.assignedAgent) {
+      const notifyAgent = new Notification({
+        userId: delivery.assignedAgent,
+        message: `⚠️ Delivery has been cancelled: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`
+      });
+      await notifyAgent.save();
+    }
+
+    res.status(200).json({ message: `✅ Delivery cancelled by ${cancelledBy}` });
+  } catch (err) {
+    console.error('❌ Error cancelling delivery:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
