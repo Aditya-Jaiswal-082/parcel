@@ -93,6 +93,7 @@ router.post('/create', async (req, res) => {
   }
 });
 
+
 router.get('/track/:trackingId', async (req, res) => {
   try {
     const delivery = await Delivery.findOne({ trackingId: req.params.trackingId })
@@ -108,6 +109,8 @@ router.get('/track/:trackingId', async (req, res) => {
   }
 });
 
+
+
 router.get('/unassigned', async (req, res) => {
   try {
     const deliveries = await Delivery.find({ assignedAgent: null }).populate('userId', 'name email');
@@ -117,33 +120,63 @@ router.get('/unassigned', async (req, res) => {
   }
 });
 
+
+
 router.post('/assign/:id', async (req, res) => {
   try {
     const { agentId } = req.body;
-    if (!mongoose.Types.ObjectId.isValid(agentId)) return res.status(400).json({ error: 'Invalid agent ID' });
 
-    const delivery = await Delivery.findById(req.params.id);
-    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
-    if (delivery.assignedAgent) return res.status(400).json({ error: 'Delivery already assigned' });
+    if (!mongoose.Types.ObjectId.isValid(agentId)) {
+      return res.status(400).json({ error: 'Invalid agent ID' });
+    }
 
+    const delivery = await Delivery.findById(req.params.id).populate('userId', 'name email');
+    if (!delivery) {
+      return res.status(404).json({ error: 'Delivery not found' });
+    }
+    if (delivery.assignedAgent) {
+      return res.status(400).json({ error: 'Delivery already assigned' });
+    }
+
+    const agent = await User.findById(agentId);
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+
+
+    // Assign delivery
     delivery.assignedAgent = agentId;
     delivery.status = 'assigned';
     delivery.statusUpdates.push({ status: 'assigned', timestamp: new Date() });
     await delivery.save();
 
+
+    // Notify agent (in-app)
     const notification = new Notification({
       userId: agentId,
       message: `📦 You have been assigned a new delivery: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`
     });
-
     await notification.save();
 
-    res.status(200).json({ message: '✅ Delivery assigned to agent' });
+    // Notify user (email)
+    const subject = '📦 Delivery Assigned';
+    const message = `Hello ${delivery.userId.name},\n\nYour delivery (Tracking ID: ${delivery.trackingId}) has been assigned to our agent **${agent.name}**.\nThey will be reaching you soon to pick up the parcel.\n\nThanks for choosing our service!\n\n- Team`;
+
+    try {
+      await sendEmail(delivery.userId.email, subject, message);
+    } catch (emailErr) {
+      console.error(`❌ Failed to send email to user:`, emailErr.message);
+    }
+
+    res.status(200).json({ message: '✅ Delivery assigned and user notified' });
+
   } catch (err) {
     console.error('❌ Error in assigning delivery:', err.message);
     res.status(500).json({ error: 'Failed to assign delivery' });
   }
 });
+
+
 
 router.patch('/claim/:id', async (req, res) => {
   try {
@@ -173,6 +206,8 @@ router.patch('/claim/:id', async (req, res) => {
   }
 });
 
+
+
 router.patch('/update-status/:id', async (req, res) => {
   const { id } = req.params;
   const { newStatus } = req.body;
@@ -193,6 +228,8 @@ router.patch('/update-status/:id', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+
 
 router.patch('/cancel/:id', async (req, res) => {
   try {
@@ -228,6 +265,8 @@ router.patch('/cancel/:id', async (req, res) => {
   }
 });
 
+
+
 router.get('/pending', async (req, res) => {
   try {
     const pendingDeliveries = await Delivery.find({ status: 'pending' });
@@ -236,6 +275,8 @@ router.get('/pending', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+
 
 router.get('/user/:userId', async (req, res) => {
   const { userId } = req.params;
@@ -251,6 +292,34 @@ router.get('/user/:userId', async (req, res) => {
   }
 });
 
+
+
+// DELETE /api/delivery/admin-delete/:id
+router.delete('/admin-delete/:id', async (req, res) => {
+  try {
+    const delivery = await Delivery.findById(req.params.id).populate('userId', 'email');
+    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
+
+    const trackingId = delivery.trackingId || '[No Tracking ID]';
+    const email = delivery.userId?.email;
+
+    await Delivery.deleteOne({ _id: req.params.id });
+
+    if (email) {
+      const subject = '❌ Delivery Cancelled by Admin';
+      const message = `Your delivery (${trackingId}) has been cancelled by the admin.\n\nIf you believe this was a mistake or need help, please contact support.`;
+      await sendEmail(email, subject, message);
+    }
+
+    res.status(200).json({ message: '✅ Delivery deleted and user notified' });
+  } catch (err) {
+    console.error('❌ Error deleting delivery by admin:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+
 router.get('/all', async (req, res) => {
   try {
     const deliveries = await Delivery.find()
@@ -261,6 +330,7 @@ router.get('/all', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 router.get('/assigned/:agentId', async (req, res) => {
   const { agentId } = req.params;
@@ -279,6 +349,7 @@ router.get('/assigned/:agentId', async (req, res) => {
   }
 });
 
+
 router.patch('/complete/:id', async (req, res) => {
   try {
     const delivery = await Delivery.findById(req.params.id);
@@ -293,5 +364,7 @@ router.patch('/complete/:id', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+
 
 module.exports = router;

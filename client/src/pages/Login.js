@@ -26,7 +26,15 @@ function Login() {
       localStorage.setItem('userId', userId);
 
       alert('Login successful');
+      if (role === 'admin') {
+        navigate('/AdminDashboard');
+      }
+      else if (role === 'agent') {
+        navigate('/AgentDashboard');
+      }
+        else{
       navigate('/UserDashboard');
+        }
 
     } catch (err) {
       console.error('🔥 Login error:', err.response?.data || err.message);

@@ -9,12 +9,22 @@ const StatusUpdateSchema = new mongoose.Schema({
       'onpickup',
       'payment done',
       'in progress',
-      'delivered'
+      'delivered',
+      'cancelled' // ✅ Allow cancellation status
     ]
   },
   timestamp: {
     type: Date,
     default: Date.now
+  },
+  cancelledBy: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: null
+  },
+  reason: {
+    type: String,
+    default: null
   }
 });
 
@@ -53,7 +63,8 @@ const DeliverySchema = new mongoose.Schema({
       'onpickup',
       'payment done',
       'in progress',
-      'delivered'
+      'delivered',
+      'cancelled' // ✅ Add cancelled as a valid status
     ],
     default: 'created'
   },

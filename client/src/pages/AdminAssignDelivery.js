@@ -1,6 +1,9 @@
 // File: src/AdminAssignDelivery.js
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 
 function AdminAssignDelivery() {
   const [deliveries, setDeliveries] = useState([]);
@@ -22,6 +25,22 @@ function AdminAssignDelivery() {
       console.error('❌ Error fetching data:', err.message);
     }
   };
+
+
+  const handleDelete = async (deliveryId) => {
+  if (!window.confirm('Are you sure you want to delete this delivery?')) return;
+
+  try {
+    await axios.delete(`http://localhost:5000/api/delivery/admin-delete/${deliveryId}`);
+    alert('✅ Delivery deleted and user notified.');
+    fetchData(); // Refresh list
+  } catch (err) {
+    console.error('❌ Delete failed:', err.response?.data || err.message);
+    alert('Delete failed.');
+  }
+};
+
+
 
   const handleAssign = async (deliveryId) => {
     const agentId = agentSelections[deliveryId];
@@ -55,6 +74,7 @@ function AdminAssignDelivery() {
               <th>User</th>
               <th>Assign to Agent</th>
               <th>Action</th>
+              <th>Delete</th>
             </tr>
           </thead>
           <tbody>
@@ -86,11 +106,21 @@ function AdminAssignDelivery() {
                     Assign
                   </button>
                 </td>
+                <td>
+                  <button
+                    onClick={() => handleDelete(delivery._id)}
+                    style={{ backgroundColor: 'red', color: 'white' }}
+                  >
+                    Delete
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
+      <ToastContainer position="top-right" autoClose={3000} />
+
     </div>
   );
 }
