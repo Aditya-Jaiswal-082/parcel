@@ -1,18 +1,24 @@
+// routes/admin.js
 const express = require('express');
 const router = express.Router();
+const { authenticate, authorizeRoles } = require('../middleware/authMiddleware');
 
 const User = require('../models/User');
 const Delivery = require('../models/Delivery');
 const Notification = require('../models/Notification');
 const sendEmail = require('../utils/sendEmail');
 
-// Generate a unique tracking ID
+// 📦 Generate a unique tracking ID
 const generateTrackingId = () => {
   const prefix = 'TRK';
   const random = Math.random().toString(36).substring(2, 8).toUpperCase();
   const timestamp = Date.now().toString().slice(-5);
   return `${prefix}-${random}-${timestamp}`;
 };
+
+// ✅ Protect ALL admin routes with authentication and admin-only access
+router.use(authenticate);
+router.use(authorizeRoles('admin'));
 
 // ✅ GET all users
 router.get('/users', async (req, res) => {
@@ -25,7 +31,7 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// ✅ GET agents only
+// ✅ GET only agents
 router.get('/agents', async (req, res) => {
   try {
     const agents = await User.find({ role: 'agent' }).select('name email role');
@@ -36,25 +42,23 @@ router.get('/agents', async (req, res) => {
   }
 });
 
-// ✅ ASSIGN delivery to agent (Fixed trackingId issue)
+// ✅ ASSIGN delivery to agent and send notification
 router.patch('/assign-delivery/:deliveryId', async (req, res) => {
   const { deliveryId } = req.params;
   const { agentId } = req.body;
 
   try {
-    const delivery = await Delivery.findById(deliveryId);
+    const delivery = await Delivery.findById(deliveryId).populate('userId', 'name email');
     if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
 
     if (delivery.assignedAgent) {
       return res.status(400).json({ error: 'Delivery already assigned' });
     }
 
-    // 🔒 Validate required fields before saving
     if (!delivery.pickupAddress || !delivery.deliveryAddress || !delivery.contactNumber) {
       return res.status(400).json({ error: 'Delivery missing required details' });
     }
 
-    // ✅ Fix missing tracking ID if it wasn't generated properly
     if (!delivery.trackingId) {
       delivery.trackingId = generateTrackingId();
       console.warn(`⚠️ Assigned new trackingId to delivery: ${delivery.trackingId}`);
@@ -66,21 +70,33 @@ router.patch('/assign-delivery/:deliveryId', async (req, res) => {
 
     await delivery.save();
 
-    // Notify agent
+    // In-app notification to agent
     const notification = new Notification({
       userId: agentId,
-      message: `You have been assigned a delivery from ${delivery.pickupAddress} to ${delivery.deliveryAddress}`
+      message: `📦 You have been assigned a delivery from ${delivery.pickupAddress} to ${delivery.deliveryAddress}`
     });
     await notification.save();
 
-    res.status(200).json({ message: '✅ Delivery assigned to agent successfully' });
+    // Email notification to user
+    const agent = await User.findById(agentId);
+    const subject = '📦 Delivery Assigned';
+    const message = `Hello ${delivery.userId.name},\n\nYour delivery (Tracking ID: ${delivery.trackingId}) has been assigned to our agent ${agent.name}.\nThey will be reaching you soon to pick up the parcel.\n\nThanks for choosing our service!\n\n- Team`;
+
+    try {
+      await sendEmail(delivery.userId.email, subject, message);
+    } catch (err) {
+      console.error(`❌ Failed to send email to user:`, err.message);
+    }
+
+    res.status(200).json({ message: '✅ Delivery assigned to agent and user notified' });
+
   } catch (err) {
     console.error('❌ Admin assign error:', err.message);
     res.status(500).json({ error: 'Server error during assignment' });
   }
 });
 
-// ✅ UPDATE user info or role
+// ✅ UPDATE user details or role
 router.patch('/user/:id', async (req, res) => {
   const { name, email, role } = req.body;
 

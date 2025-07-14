@@ -90,11 +90,13 @@ function Payments() {
 
               const token = localStorage.getItem('token');
               await axios.post('http://localhost:5000/api/delivery/create', payload, {
+                // await axios.post('/api/delivery/create', payload, {
+
                 headers: { Authorization: `Bearer ${token}` }
-              });
+              }); 
 
               alert('✅ Order placed successfully! Please pay in cash upon pickup.');
-              navigate('/mydeliveries');
+              navigate('/Cart');
             } else {
               console.error('Distance matrix error:', status);
               alert('Failed to calculate distance. Try again.');

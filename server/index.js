@@ -5,39 +5,52 @@ const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
+const PORT = process.env.PORT || 5000;
+
+// ======= Middleware =======
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 5000;
-
+// ======= Test Route =======
 app.get('/', (req, res) => {
-  res.send('Server is running...');
+  res.send('🚀 Server is running...');
 });
 
+// ======= Connect to MongoDB =======
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 }).then(() => {
-  console.log('Connected to MongoDB');
+  console.log('✅ Connected to MongoDB');
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`🌐 Server running on port ${PORT}`);
   });
-}).catch((err) => console.log(err));
+}).catch((err) => console.error('❌ MongoDB connection error:', err));
 
-const authRoutes = require("./routes/auth");
-app.use("/api/auth", authRoutes);
+// ======= Routes =======
 
+// 🔐 Auth (Login/Register)
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
+
+// 📦 Deliveries
 const deliveryRoutes = require('./routes/delivery');
 app.use('/api/delivery', deliveryRoutes);
 
-app.use('/api/notifications', require('./routes/notifications'));
-
+// 🛎️ Notifications (In-App)
 const notificationRoutes = require('./routes/notification');
 app.use('/api/notifications', notificationRoutes);
 
-app.use('/api/delivery', require('./routes/delivery'));
+// 🧮 Distance Calculation (if used for pricing)
+const distanceRoutes = require('./routes/distance');
+app.use('/api', distanceRoutes);
 
+// 🛂 Admin (Manage users, assign deliveries)
 const adminRoutes = require('./routes/admin');
 app.use('/api/admin', adminRoutes);
 
-app.use('/api', require('./routes/distance'));
+// ======= Error Handling Middleware (optional) =======
+app.use((err, req, res, next) => {
+  console.error('❌ Internal Error:', err.stack);
+  res.status(500).json({ error: 'Internal server error' });
+});

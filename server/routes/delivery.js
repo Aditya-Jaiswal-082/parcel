@@ -1,6 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
+const { authenticate, authorizeRoles } = require('../middleware/authMiddleware');
+
 
 const Delivery = require('../models/Delivery');
 const User = require('../models/User');
@@ -41,6 +43,8 @@ router.post('/create', async (req, res) => {
     if (!pickupCoordinates || !deliveryCoordinates) {
       return res.status(400).json({ error: 'Coordinates for both locations are required' });
     }
+
+    router.use(authenticate);
 
     const trackingId = generateTrackingId();
 
@@ -94,6 +98,7 @@ router.post('/create', async (req, res) => {
 });
 
 
+// Track a delivery by its tracking ID
 router.get('/track/:trackingId', async (req, res) => {
   try {
     const delivery = await Delivery.findOne({ trackingId: req.params.trackingId })
@@ -109,7 +114,7 @@ router.get('/track/:trackingId', async (req, res) => {
   }
 });
 
-
+// Get all unassigned deliveries
 
 router.get('/unassigned', async (req, res) => {
   try {
@@ -208,26 +213,37 @@ router.patch('/claim/:id', async (req, res) => {
 
 
 
+
+
+// Update delivery status and notify user
 router.patch('/update-status/:id', async (req, res) => {
-  const { id } = req.params;
-  const { newStatus } = req.body;
-
-  if (!newStatus) return res.status(400).json({ error: 'New status is required' });
-
   try {
-    const delivery = await Delivery.findById(id);
+    const { newStatus } = req.body;
+    const delivery = await Delivery.findById(req.params.id).populate('userId', 'name email');
+
     if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
 
     delivery.status = newStatus;
     delivery.statusUpdates.push({ status: newStatus, timestamp: new Date() });
     await delivery.save();
 
-    res.status(200).json({ message: `Status updated to ${newStatus}` });
+    const subject = `📦 Delivery Status Update: ${newStatus}`;
+    const message = `Hello ${delivery.userId.name},\n\nYour delivery (Tracking ID: ${delivery.trackingId}) status has been updated to: ${newStatus}.\n\nYou can track your delivery for more information.`;
+
+    try {
+      await sendEmail(delivery.userId.email, subject, message);
+    } catch (emailErr) {
+      console.error(`❌ Failed to send status update email:`, emailErr.message);
+    }
+
+    res.status(200).json({ message: `✅ Status updated to ${newStatus}` });
   } catch (err) {
-    console.error('Error updating status:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    console.error('❌ Error updating status:', err.message);
+    res.status(500).json({ error: 'Failed to update status' });
   }
 });
+
+module.exports = router;
 
 
 
@@ -239,7 +255,7 @@ router.patch('/cancel/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid cancelledBy value (should be user or admin)' });
     }
 
-    const delivery = await Delivery.findById(req.params.id);
+    const delivery = await Delivery.findById(req.params.id).populate('userId', 'email');
     if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
 
     if (delivery.status === 'cancelled' || delivery.status === 'delivered') {
@@ -258,12 +274,19 @@ router.patch('/cancel/:id', async (req, res) => {
       await notifyAgent.save();
     }
 
+    if (delivery.userId?.email) {
+      const subject = '⚠️ Delivery Cancelled';
+      const message = `Your delivery (Tracking ID: ${delivery.trackingId}) was cancelled by the ${cancelledBy}.\n\nIf you have questions, please reach out to our support team.`;
+      await sendEmail(delivery.userId.email, subject, message);
+    }
+
     res.status(200).json({ message: `✅ Delivery cancelled by ${cancelledBy}` });
   } catch (err) {
     console.error('❌ Error cancelling delivery:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 
 
@@ -295,6 +318,7 @@ router.get('/user/:userId', async (req, res) => {
 
 
 // DELETE /api/delivery/admin-delete/:id
+// Admin deletes a delivery and notifies the user via email
 router.delete('/admin-delete/:id', async (req, res) => {
   try {
     const delivery = await Delivery.findById(req.params.id).populate('userId', 'email');

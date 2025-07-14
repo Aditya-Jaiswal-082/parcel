@@ -9,17 +9,20 @@ function AdminManageUsers() {
   const [form, setForm] = useState({ name: '', email: '', role: '' });
 
   const fetchUsers = async () => {
-    try {
-      const res = await axios.get('http://localhost:5000/api/admin/users');
-      setUsers(res.data);
-    } catch (err) {
-      console.error('Failed to fetch users', err);
-    }
-  };
+  try {
+    const res = await axios.get('http://localhost:5000/api/admin/users', {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    console.log('Fetched users:', res.data); // 👈 ADD THIS
+    setUsers(res.data);
+  } catch (err) {
+    console.error('Failed to fetch users', err);
+  }
+};
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+
 
   const filteredUsers = users.filter(u => (filter === 'all' ? true : u.role === filter));
 
@@ -29,29 +32,41 @@ function AdminManageUsers() {
   };
 
   const handleUpdate = async (id) => {
-    try {
-      await axios.patch(`http://localhost:5000/api/admin/user/${id}`, form);
-      alert('✅ User updated successfully');
-      setEditing(null);
-      fetchUsers();
-    } catch (err) {
-      console.error('❌ Error updating user:', err);
-      alert('Failed to update user.');
-    }
-  };
+  try {
+    const token = localStorage.getItem('token');
+    await axios.patch(`http://localhost:5000/api/admin/user/${id}`, form, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    alert('✅ User updated successfully');
+    setEditing(null);
+    fetchUsers();
+  } catch (err) {
+    console.error('❌ Error updating user:', err.response?.data || err.message);
+    alert('Failed to update user.');
+  }
+};
+
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+  if (!window.confirm('Are you sure you want to delete this user?')) return;
 
-    try {
-      await axios.delete(`http://localhost:5000/api/admin/user/${id}`);
-      alert('🗑️ User deleted');
-      fetchUsers();
-    } catch (err) {
-      console.error('❌ Error deleting user:', err);
-      alert('Failed to delete user.');
-    }
-  };
+  try {
+    const token = localStorage.getItem('token');
+    await axios.delete(`http://localhost:5000/api/admin/user/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    alert('🗑️ User deleted');
+    fetchUsers();
+  } catch (err) {
+    console.error('❌ Error deleting user:', err.response?.data || err.message);
+    alert('Failed to delete user.');
+  }
+};
+
 
   return (
     <div className="container">

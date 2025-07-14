@@ -133,6 +133,12 @@ function AddToCart() {
       <h2>Create a Delivery</h2>
       <form onSubmit={handleNext}>
         <label>Pickup Address</label>
+        <select onChange={e => handleSavedAddressSelect('pickup', e.target.value)}>
+          <option value="">-- Select Saved Pickup --</option>
+          {savedAddresses.pickup.map((addr, i) => (
+            <option key={i} value={i}>{addr.label}</option>
+          ))}
+        </select>
         <input
           type="text"
           name="pickupAddress"
@@ -154,14 +160,15 @@ function AddToCart() {
         }}>
           💾 Save Pickup Address
         </button>
-        <select onChange={e => handleSavedAddressSelect('pickup', e.target.value)}>
-          <option value="">-- Select Saved Pickup --</option>
-          {savedAddresses.pickup.map((addr, i) => (
+        
+
+        <label>Delivery Address</label>
+        <select onChange={e => handleSavedAddressSelect('delivery', e.target.value)}>
+          <option value="">-- Select Saved Delivery --</option>
+          {savedAddresses.delivery.map((addr, i) => (
             <option key={i} value={i}>{addr.label}</option>
           ))}
         </select>
-
-        <label>Delivery Address</label>
         <input
           type="text"
           name="deliveryAddress"
@@ -183,12 +190,7 @@ function AddToCart() {
         }}>
           💾 Save Delivery Address
         </button>
-        <select onChange={e => handleSavedAddressSelect('delivery', e.target.value)}>
-          <option value="">-- Select Saved Delivery --</option>
-          {savedAddresses.delivery.map((addr, i) => (
-            <option key={i} value={i}>{addr.label}</option>
-          ))}
-        </select>
+        
 
         <label>Parcel Description</label>
         <input
@@ -214,7 +216,6 @@ function AddToCart() {
           name="deliveryDate"
           value={formData.deliveryDate}
           onChange={handleChange}
-          required
         />
 
         <button type="submit">Next</button>
