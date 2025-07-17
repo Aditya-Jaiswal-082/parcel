@@ -16,7 +16,7 @@ import Payment from './pages/payments';
 function Home() {
   return (
     <div>
-      <h1>Welcome to Parcel Swift</h1>
+      <h1>Welcome to Ammu's Delivery</h1>
       <p>📦 We provide fast and reliable parcel delivery services from home-to-home across your city.</p>
       <h2>🔐 Access Made Easy</h2>
       <p>Login or signup to get started with our delivery services. Fast, easy, and secure!</p>
