@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Navbar from './pages/Navbar';
@@ -12,11 +13,15 @@ import Notifications from './pages/Notifications';
 import AdminAssignDelivery from './pages/AdminAssignDelivery';
 import AdminManageUsers from './pages/AdminManageUsers';
 import Payment from './pages/payments';
-import './App.css'; // Add this CSS file
+import './App.css';
 
 function Home() {
   const [trackingId, setTrackingId] = useState('');
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [trackingData, setTrackingData] = useState(null);
+  const [isTracking, setIsTracking] = useState(false);
+  const [trackingError, setTrackingError] = useState(null);
+  const [showTrackingResult, setShowTrackingResult] = useState(false);
   const navigate = useNavigate();
   
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -53,11 +58,45 @@ function Home() {
     return () => clearInterval(timer);
   }, []);
 
-  const handleTrackPackage = (e) => {
+  // Status mapping with icons and colors
+  const getStatusInfo = (status) => {
+    const statusMap = {
+      'created': { icon: '📦', label: 'Order Created', color: '#6c757d', progress: 10 },
+      'pending': { icon: '⏳', label: 'Pending Pickup', color: '#ffc107', progress: 20 },
+      'assigned': { icon: '👨‍🚛', label: 'Agent Assigned', color: '#17a2b8', progress: 40 },
+      'picked_up': { icon: '📋', label: 'Package Picked Up', color: '#007bff', progress: 60 },
+      'in_transit': { icon: '🚛', label: 'In Transit', color: '#fd7e14', progress: 80 },
+      'delivered': { icon: '✅', label: 'Delivered', color: '#28a745', progress: 100 },
+      'cancelled': { icon: '❌', label: 'Cancelled', color: '#dc3545', progress: 0 }
+    };
+    return statusMap[status] || { icon: '❓', label: 'Unknown', color: '#6c757d', progress: 0 };
+  };
+
+  // Enhanced tracking function
+  const handleTrackPackage = async (e) => {
     e.preventDefault();
-    if (trackingId.trim()) {
-      // You can add tracking functionality here
-      alert(`Tracking package: ${trackingId}`);
+    if (!trackingId.trim()) {
+      setTrackingError('Please enter a tracking ID');
+      return;
+    }
+
+    setIsTracking(true);
+    setTrackingError(null);
+    setTrackingData(null);
+
+    try {
+      const response = await axios.get(`http://localhost:5000/api/delivery/track/${trackingId.trim()}`);
+      setTrackingData(response.data);
+      setShowTrackingResult(true);
+    } catch (error) {
+      console.error('Tracking error:', error);
+      setTrackingError(
+        error.response?.status === 404 
+          ? 'Tracking ID not found. Please check and try again.' 
+          : 'Unable to fetch tracking information. Please try again later.'
+      );
+    } finally {
+      setIsTracking(false);
     }
   };
 
@@ -69,6 +108,54 @@ function Home() {
     } else {
       navigate('/signup');
     }
+  };
+
+  const closeTrackingResult = () => {
+    setShowTrackingResult(false);
+    setTrackingData(null);
+    setTrackingError(null);
+    setTrackingId('');
+  };
+
+  // Format date function
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Render tracking timeline
+  const renderTrackingTimeline = () => {
+    if (!trackingData || !trackingData.statusUpdates) return null;
+
+    const statusUpdates = [...trackingData.statusUpdates].reverse();
+    
+    return (
+      <div className="tracking-timeline">
+        <h4>📋 Delivery Timeline</h4>
+        <div className="timeline">
+          {statusUpdates.map((update, index) => {
+            const statusInfo = getStatusInfo(update.status);
+            return (
+              <div key={index} className={`timeline-item ${index === 0 ? 'active' : ''}`}>
+                <div className="timeline-marker" style={{ backgroundColor: statusInfo.color }}>
+                  <span className="timeline-icon">{statusInfo.icon}</span>
+                </div>
+                <div className="timeline-content">
+                  <h5>{statusInfo.label}</h5>
+                  <p className="timeline-date">{formatDate(update.timestamp)}</p>
+                  {update.notes && <p className="timeline-notes">{update.notes}</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -120,7 +207,7 @@ function Home() {
         </div>
       </section>
 
-      {/* Quick Track Section */}
+      {/* Enhanced Quick Track Section */}
       <section className="quick-track-section">
         <div className="container">
           <div className="track-card">
@@ -135,19 +222,150 @@ function Home() {
                   type="text"
                   placeholder="Enter tracking ID (e.g., TRK-ABC123-12345)"
                   value={trackingId}
-                  onChange={(e) => setTrackingId(e.target.value)}
-                  className="track-input"
+                  onChange={(e) => {
+                    setTrackingId(e.target.value);
+                    setTrackingError(null);
+                  }}
+                  className={`track-input ${trackingError ? 'error' : ''}`}
+                  disabled={isTracking}
                 />
-                <button type="submit" className="btn btn-primary track-btn">
-                  Track Now
+                <button 
+                  type="submit" 
+                  className="btn btn-primary track-btn"
+                  disabled={isTracking}
+                >
+                  {isTracking ? (
+                    <span className="loading-spinner">🔄</span>
+                  ) : (
+                    'Track Now'
+                  )}
                 </button>
               </div>
+              
+              {trackingError && (
+                <div className="tracking-error">
+                  <span className="error-icon">⚠️</span>
+                  {trackingError}
+                </div>
+              )}
             </form>
+
+            {/* Loading Animation */}
+            {isTracking && (
+              <div className="tracking-loading">
+                <div className="loading-animation">
+                  <div className="truck-loading">🚛</div>
+                  <div className="loading-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+                <p>Fetching your package details...</p>
+              </div>
+            )}
           </div>
+
+          {/* Tracking Results Modal/Section */}
+          {showTrackingResult && trackingData && (
+            <div className="tracking-result-overlay">
+              <div className="tracking-result-modal">
+                <div className="modal-header">
+                  <h3>📦 Package Details</h3>
+                  <button className="close-btn" onClick={closeTrackingResult}>
+                    ❌
+                  </button>
+                </div>
+
+                <div className="modal-body">
+                  {/* Current Status */}
+                  <div className="current-status">
+                    <div className="status-icon">
+                      {getStatusInfo(trackingData.status).icon}
+                    </div>
+                    <div className="status-info">
+                      <h4>{getStatusInfo(trackingData.status).label}</h4>
+                      <p className="tracking-id">Tracking ID: {trackingData.trackingId}</p>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="delivery-progress">
+                    <div className="progress-bar-container">
+                      <div 
+                        className="progress-bar-fill"
+                        style={{ 
+                          width: `${getStatusInfo(trackingData.status).progress}%`,
+                          backgroundColor: getStatusInfo(trackingData.status).color
+                        }}
+                      ></div>
+                    </div>
+                    <div className="progress-percentage">
+                      {getStatusInfo(trackingData.status).progress}% Complete
+                    </div>
+                  </div>
+
+                  {/* Package Information */}
+                  <div className="package-info">
+                    <div className="info-grid">
+                      <div className="info-item">
+                        <span className="info-label">📍 From:</span>
+                        <span className="info-value">{trackingData.pickupAddress}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">🎯 To:</span>
+                        <span className="info-value">{trackingData.deliveryAddress}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">👤 Customer:</span>
+                        <span className="info-value">{trackingData.userId?.name || 'N/A'}</span>
+                      </div>
+                      {trackingData.assignedAgent && (
+                        <div className="info-item">
+                          <span className="info-label">🚛 Agent:</span>
+                          <span className="info-value">{trackingData.assignedAgent.name}</span>
+                        </div>
+                      )}
+                      <div className="info-item">
+                        <span className="info-label">📞 Contact:</span>
+                        <span className="info-value">{trackingData.contactNumber}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">📦 Description:</span>
+                        <span className="info-value">{trackingData.description}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Timeline */}
+                  {renderTrackingTimeline()}
+
+                  {/* Estimated Delivery */}
+                  {trackingData.status !== 'delivered' && trackingData.status !== 'cancelled' && (
+                    <div className="estimated-delivery">
+                      <h4>🕒 Estimated Delivery</h4>
+                      <p>{new Date(trackingData.deliveryDate).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="modal-footer">
+                  <button className="btn btn-primary" onClick={closeTrackingResult}>
+                    Close
+                  </button>
+                  {trackingData.assignedAgent && (
+                    <button className="btn btn-outline">
+                      📞 Contact Agent
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Services Section */}
+      {/* Rest of your existing sections remain the same */}
       <section className="services-section">
         <div className="container">
           <div className="section-header">
