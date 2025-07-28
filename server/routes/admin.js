@@ -20,13 +20,57 @@ const generateTrackingId = () => {
 router.use(authenticate);
 router.use(authorizeRoles('admin'));
 
+// 📊 Dashboard statistics
+router.get('/dashboard', async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments({ role: { $ne: 'admin' } });
+    const totalAgents = await User.countDocuments({ role: 'agent' });
+    const totalDeliveries = await Delivery.countDocuments();
+    const pendingDeliveries = await Delivery.countDocuments({ status: 'pending' });
+    const assignedDeliveries = await Delivery.countDocuments({ status: 'assigned' });
+    const completedDeliveries = await Delivery.countDocuments({ status: 'delivered' });
+    
+    res.status(200).json({
+      stats: {
+        totalUsers,
+        totalAgents,
+        totalDeliveries,
+        pendingDeliveries,
+        assignedDeliveries,
+        completedDeliveries
+      }
+    });
+  } catch (err) {
+    console.error('❌ Error fetching dashboard stats:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ✅ GET all users
 router.get('/users', async (req, res) => {
   try {
-    const users = await User.find().select('name email role');
+    const users = await User.find().select('name email role createdAt');
     res.status(200).json(users);
   } catch (err) {
     console.error('❌ Error fetching users:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ✅ GET users by role
+router.get('/users/:role', async (req, res) => {
+  try {
+    const { role } = req.params;
+    const validRoles = ['user', 'agent', 'admin'];
+    
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const users = await User.find({ role }).select('name email role createdAt');
+    res.status(200).json(users);
+  } catch (err) {
+    console.error('❌ Error fetching users by role:', err.message);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -38,6 +82,37 @@ router.get('/agents', async (req, res) => {
     res.status(200).json(agents);
   } catch (err) {
     console.error('❌ Error fetching agents:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// 📦 GET all deliveries
+router.get('/deliveries', async (req, res) => {
+  try {
+    const deliveries = await Delivery.find()
+      .populate('userId', 'name email')
+      .populate('assignedAgent', 'name email')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json(deliveries);
+  } catch (err) {
+    console.error('❌ Error fetching deliveries:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// 📦 GET deliveries by status
+router.get('/deliveries/:status', async (req, res) => {
+  try {
+    const { status } = req.params;
+    const deliveries = await Delivery.find({ status })
+      .populate('userId', 'name email')
+      .populate('assignedAgent', 'name email')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json(deliveries);
+  } catch (err) {
+    console.error('❌ Error fetching deliveries by status:', err.message);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -93,6 +168,43 @@ router.patch('/assign-delivery/:deliveryId', async (req, res) => {
   } catch (err) {
     console.error('❌ Admin assign error:', err.message);
     res.status(500).json({ error: 'Server error during assignment' });
+  }
+});
+
+// 📦 Update delivery status manually
+router.patch('/delivery/:deliveryId/status', async (req, res) => {
+  const { deliveryId } = req.params;
+  const { status, notes } = req.body;
+
+  try {
+    const delivery = await Delivery.findById(deliveryId).populate('userId', 'name email');
+    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
+
+    const validStatuses = ['pending', 'assigned', 'picked_up', 'in_transit', 'delivered', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    delivery.status = status;
+    delivery.statusUpdates.push({ 
+      status, 
+      timestamp: new Date(),
+      notes: notes || `Status updated by admin`
+    });
+
+    await delivery.save();
+
+    // Notify user about status change
+    const notification = new Notification({
+      userId: delivery.userId._id,
+      message: `📦 Your delivery (${delivery.trackingId}) status updated to: ${status.replace('_', ' ').toUpperCase()}`
+    });
+    await notification.save();
+
+    res.status(200).json({ message: '✅ Delivery status updated successfully' });
+  } catch (err) {
+    console.error('❌ Error updating delivery status:', err.message);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -162,6 +274,50 @@ router.delete('/user/:id', async (req, res) => {
     res.status(200).json({ message: '🗑️ User deleted successfully' });
   } catch (err) {
     console.error('❌ Error deleting user:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// 🔔 GET all notifications
+router.get('/notifications', async (req, res) => {
+  try {
+    const notifications = await Notification.find()
+      .populate('userId', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    
+    res.status(200).json(notifications);
+  } catch (err) {
+    console.error('❌ Error fetching notifications:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// 📢 Send broadcast notification
+router.post('/broadcast', async (req, res) => {
+  const { message, userType } = req.body;
+
+  try {
+    let userQuery = {};
+    if (userType === 'users') userQuery = { role: 'user' };
+    if (userType === 'agents') userQuery = { role: 'agent' };
+    if (userType === 'all') userQuery = { role: { $ne: 'admin' } };
+
+    const users = await User.find(userQuery);
+    
+    const notifications = users.map(user => ({
+      userId: user._id,
+      message: `📢 Admin Announcement: ${message}`
+    }));
+
+    await Notification.insertMany(notifications);
+
+    res.status(200).json({ 
+      message: `✅ Broadcast sent to ${users.length} users`,
+      count: users.length 
+    });
+  } catch (err) {
+    console.error('❌ Error sending broadcast:', err.message);
     res.status(500).json({ error: 'Server error' });
   }
 });
