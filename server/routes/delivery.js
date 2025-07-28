@@ -36,8 +36,82 @@ router.get('/track/:trackingId', async (req, res) => {
 // ✅ AUTHENTICATED ROUTES
 router.use(authenticate); // Apply authentication to all routes below
 
-// Create new delivery (users only)
-router.post('/create', authorizeRoles('user'), async (req, res) => {
+// ✅ Get agent statistics
+router.get('/agent/stats/:agentId', authorizeRoles('agent', 'admin'), async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    
+    // Verify the agent is requesting their own stats (unless admin)
+    if (req.user.role === 'agent' && req.user._id.toString() !== agentId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    // Get current date for today's stats
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // Get total available deliveries (unassigned)
+    const totalAvailable = await Delivery.countDocuments({ 
+      $or: [
+        { assignedAgent: null },
+        { assignedAgent: { $exists: false } }
+      ],
+      status: { $in: ['pending', 'created'] }
+    });
+
+    // Get total assigned deliveries for this agent
+    const totalAssigned = await Delivery.countDocuments({ 
+      assignedAgent: agentId,
+      status: { $in: ['assigned', 'picked_up', 'in_transit'] }
+    });
+
+    // Get completed deliveries today
+    const completedToday = await Delivery.countDocuments({
+      assignedAgent: agentId,
+      status: 'delivered',
+      updatedAt: { $gte: today, $lt: tomorrow }
+    });
+
+    // Calculate today's earnings
+    const earningsResult = await Delivery.aggregate([
+      {
+        $match: {
+          assignedAgent: mongoose.Types.ObjectId(agentId),
+          status: 'delivered',
+          updatedAt: { $gte: today, $lt: tomorrow }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { 
+            $sum: { 
+              $toDouble: { $ifNull: ['$estimatedPrice', '$price', 0] } 
+            } 
+          }
+        }
+      }
+    ]);
+
+    const todaysEarnings = earningsResult.length > 0 ? earningsResult[0].totalEarnings : 0;
+
+    res.status(200).json({
+      totalAvailable,
+      totalAssigned,
+      completedToday,
+      earnings: Math.round(todaysEarnings)
+    });
+
+  } catch (error) {
+    console.error('Error fetching agent stats:', error);
+    res.status(500).json({ error: 'Failed to fetch agent statistics' });
+  }
+});
+
+// Create new delivery (users and admin only)
+router.post('/create', authorizeRoles('user', 'admin'), async (req, res) => {
   try {
     const {
       userId,
@@ -48,7 +122,28 @@ router.post('/create', authorizeRoles('user'), async (req, res) => {
       deliveryDate,
       pickupCoordinates,
       deliveryCoordinates,
-      price
+      price,
+      estimatedPrice,
+      estimatedDistance,
+      // Enhanced fields from AddToCart
+      senderName,
+      recipientName,
+      recipientContact,
+      deliveryTime,
+      packageType,
+      packageWeight,
+      urgency,
+      fragile,
+      requiresSignature,
+      specialInstructions,
+      additionalInfoPickup,
+      additionalInfoDelivery,
+      requiresPackaging,
+      packagingType,
+      sameBuildingDelivery,
+      pickupUnit,
+      deliveryUnit,
+      pricingBreakdown
     } = req.body;
 
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
@@ -65,6 +160,7 @@ router.post('/create', authorizeRoles('user'), async (req, res) => {
     }
 
     const trackingId = generateTrackingId();
+    const finalPrice = estimatedPrice || price || 0;
 
     const newDelivery = new Delivery({
       userId,
@@ -75,12 +171,35 @@ router.post('/create', authorizeRoles('user'), async (req, res) => {
       description,
       contactNumber,
       deliveryDate,
-      price,
+      price: finalPrice,
+      estimatedPrice: finalPrice,
+      estimatedDistance,
       trackingId,
-      status: 'created',
+      status: 'pending',
+      
+      // Enhanced fields
+      senderName,
+      recipientName,
+      recipientContact,
+      deliveryTime,
+      packageType,
+      packageWeight,
+      urgency,
+      fragile,
+      requiresSignature,
+      specialInstructions,
+      additionalInfoPickup,
+      additionalInfoDelivery,
+      requiresPackaging,
+      packagingType,
+      sameBuildingDelivery,
+      pickupUnit,
+      deliveryUnit,
+      pricingBreakdown,
+      
       statusUpdates: [
         {
-          status: 'created',
+          status: 'pending',
           timestamp: new Date()
         }
       ]
@@ -88,10 +207,11 @@ router.post('/create', authorizeRoles('user'), async (req, res) => {
 
     await newDelivery.save();
 
+    // Notify admins and agents
     const usersToNotify = await User.find({ role: { $in: ['admin', 'agent'] } });
 
     const subject = '📦 New Delivery Created';
-    const message = `A new delivery has been created:\nFrom: ${pickupAddress}\nTo: ${deliveryAddress}\nDescription: ${description}`;
+    const message = `A new delivery has been created:\n\nFrom: ${pickupAddress}\nTo: ${deliveryAddress}\nDescription: ${description}\nPackage Type: ${packageType}\nUrgency: ${urgency}\nEstimated Price: ₹${finalPrice}\n\nTracking ID: ${trackingId}`;
 
     for (const user of usersToNotify) {
       try {
@@ -102,13 +222,33 @@ router.post('/create', authorizeRoles('user'), async (req, res) => {
 
       const notification = new Notification({
         userId: user._id,
-        message: `New delivery from ${pickupAddress} to ${deliveryAddress}`
+        message: `📦 New delivery created: ${pickupAddress} → ${deliveryAddress} (${trackingId})`,
+        type: 'delivery',
+        deliveryId: newDelivery._id
       });
 
       await notification.save();
     }
 
-    res.status(201).json({ message: '✅ Delivery created successfully', trackingId });
+    // Notify user about successful creation
+    try {
+      const userNotification = new Notification({
+        userId,
+        message: `✅ Your delivery has been created successfully. Tracking ID: ${trackingId}`,
+        type: 'order_confirmation',
+        deliveryId: newDelivery._id
+      });
+      await userNotification.save();
+    } catch (notificationErr) {
+      console.error('Failed to create user notification:', notificationErr);
+    }
+
+    res.status(201).json({ 
+      message: '✅ Delivery created successfully', 
+      trackingId,
+      deliveryId: newDelivery._id,
+      estimatedPrice: finalPrice
+    });
   } catch (err) {
     console.error('❌ Error in /create:', err.message);
     res.status(500).json({ error: 'Internal server error' });
@@ -132,7 +272,13 @@ router.get('/all', authorizeRoles('admin'), async (req, res) => {
 // Get all unassigned deliveries (admin and agents)
 router.get('/unassigned', authorizeRoles('admin', 'agent'), async (req, res) => {
   try {
-    const deliveries = await Delivery.find({ assignedAgent: null })
+    const deliveries = await Delivery.find({ 
+      $or: [
+        { assignedAgent: null },
+        { assignedAgent: { $exists: false } }
+      ],
+      status: { $in: ['pending', 'created'] }
+    })
       .populate('userId', 'name email')
       .sort({ createdAt: -1 });
     res.status(200).json(deliveries);
@@ -145,7 +291,7 @@ router.get('/unassigned', authorizeRoles('admin', 'agent'), async (req, res) => 
 // Get pending deliveries (admin and agents)
 router.get('/pending', authorizeRoles('admin', 'agent'), async (req, res) => {
   try {
-    const pendingDeliveries = await Delivery.find({ status: 'pending' })
+    const pendingDeliveries = await Delivery.find({ status: { $in: ['pending', 'created'] } })
       .populate('userId', 'name email')
       .sort({ createdAt: -1 });
     res.status(200).json(pendingDeliveries);
@@ -229,13 +375,20 @@ router.post('/assign/:id', authorizeRoles('admin'), async (req, res) => {
     // Assign delivery
     delivery.assignedAgent = agentId;
     delivery.status = 'assigned';
-    delivery.statusUpdates.push({ status: 'assigned', timestamp: new Date() });
+    delivery.assignedAt = new Date();
+    delivery.statusUpdates.push({ 
+      status: 'assigned', 
+      timestamp: new Date(),
+      updatedBy: req.user._id 
+    });
     await delivery.save();
 
     // Notify agent (in-app)
     const notification = new Notification({
       userId: agentId,
-      message: `📦 You have been assigned a new delivery: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`
+      message: `📦 You have been assigned a new delivery: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`,
+      type: 'assignment',
+      deliveryId: delivery._id
     });
     await notification.save();
 
@@ -260,66 +413,161 @@ router.post('/assign/:id', authorizeRoles('admin'), async (req, res) => {
 // Agent claims delivery
 router.patch('/claim/:id', authorizeRoles('agent'), async (req, res) => {
   try {
-    const agentId = req.user._id; // Get from authenticated user
+    const { agentId } = req.body;
+    const requestingAgentId = req.user._id.toString();
 
-    const delivery = await Delivery.findById(req.params.id);
-    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
-    if (delivery.assignedAgent) return res.status(400).json({ error: 'Delivery already assigned' });
+    // Verify the agent is claiming for themselves
+    if (agentId && agentId !== requestingAgentId) {
+      return res.status(403).json({ error: 'You can only claim deliveries for yourself' });
+    }
 
-    delivery.assignedAgent = agentId;
+    const delivery = await Delivery.findById(req.params.id).populate('userId', 'name email');
+    
+    if (!delivery) {
+      return res.status(404).json({ error: 'Delivery not found' });
+    }
+    
+    if (delivery.assignedAgent) {
+      return res.status(409).json({ error: 'Delivery already claimed by another agent' });
+    }
+
+    if (!['pending', 'created'].includes(delivery.status)) {
+      return res.status(400).json({ error: 'Delivery is not available for claiming' });
+    }
+
+    // Claim the delivery
+    delivery.assignedAgent = requestingAgentId;
     delivery.status = 'assigned';
-    delivery.statusUpdates.push({ status: 'assigned', timestamp: new Date() });
+    delivery.assignedAt = new Date();
+    delivery.statusUpdates.push({ 
+      status: 'assigned', 
+      timestamp: new Date(),
+      updatedBy: requestingAgentId
+    });
     await delivery.save();
 
-    const notification = new Notification({
-      userId: agentId,
-      message: `📦 You claimed a delivery from ${delivery.pickupAddress} to ${delivery.deliveryAddress}`
+    // Create notifications
+    const agentNotification = new Notification({
+      userId: requestingAgentId,
+      message: `✅ You successfully claimed delivery: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`,
+      type: 'assignment',
+      deliveryId: delivery._id
     });
+    await agentNotification.save();
 
-    await notification.save();
+    // Notify user about assignment
+    const userNotification = new Notification({
+      userId: delivery.userId._id,
+      message: `📦 Your delivery has been assigned to an agent and will be picked up soon.`,
+      type: 'assignment',
+      deliveryId: delivery._id
+    });
+    await userNotification.save();
 
-    res.status(200).json({ message: '✅ Delivery successfully claimed' });
+    res.status(200).json({ 
+      message: '✅ Delivery successfully claimed',
+      delivery: {
+        _id: delivery._id,
+        trackingId: delivery.trackingId,
+        status: delivery.status,
+        assignedAgent: requestingAgentId
+      }
+    });
   } catch (err) {
     console.error('❌ Error in claiming delivery:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Failed to claim delivery' });
   }
 });
 
 // Update delivery status (agents and admin)
-router.patch('/update-status/:id', authorizeRoles('admin', 'agent'), async (req, res) => {
+router.patch('/update-status/:deliveryId', authorizeRoles('admin', 'agent'), async (req, res) => {
   try {
-    const { newStatus } = req.body;
-    const delivery = await Delivery.findById(req.params.id).populate('userId', 'name email');
+    const { deliveryId } = req.params;
+    const { newStatus, agentId, timestamp } = req.body;
 
-    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
+    console.log('📝 Update status request:', deliveryId, newStatus);
 
-    // Agents can only update deliveries assigned to them
-    if (req.user.role === 'agent' && delivery.assignedAgent?.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: 'You can only update your assigned deliveries' });
+    // Validate required fields
+    if (!newStatus) {
+      return res.status(400).json({ error: 'New status is required' });
     }
 
-    const validStatuses = ['created', 'assigned', 'picked_up', 'in_transit', 'delivered', 'cancelled'];
+    if (!mongoose.Types.ObjectId.isValid(deliveryId)) {
+      return res.status(400).json({ error: 'Invalid delivery ID' });
+    }
+
+    // Find the delivery
+    const delivery = await Delivery.findById(deliveryId).populate('userId', 'name email');
+    
+    if (!delivery) {
+      return res.status(404).json({ error: 'Delivery not found' });
+    }
+
+    console.log('📦 Found delivery:', delivery._id, 'Current status:', delivery.status);
+
+    // Validate agent authorization
+    if (req.user.role === 'agent') {
+      if (!delivery.assignedAgent || delivery.assignedAgent.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ error: 'You can only update deliveries assigned to you' });
+      }
+    }
+
+    // Validate status transition
+    const validStatuses = ['pending', 'created', 'assigned', 'picked_up', 'in_transit', 'delivered', 'cancelled'];
     if (!validStatuses.includes(newStatus)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
+    // Update the delivery
     delivery.status = newStatus;
-    delivery.statusUpdates.push({ status: newStatus, timestamp: new Date() });
+    delivery.updatedAt = timestamp || new Date();
+    
+    // Add to status history
+    delivery.statusUpdates.push({
+      status: newStatus,
+      timestamp: timestamp || new Date(),
+      updatedBy: req.user._id
+    });
+
     await delivery.save();
+    
+    console.log('✅ Status updated successfully to:', newStatus);
 
-    const subject = `📦 Delivery Status Update: ${newStatus}`;
-    const message = `Hello ${delivery.userId.name},\n\nYour delivery (Tracking ID: ${delivery.trackingId}) status has been updated to: ${newStatus.replace('_', ' ').toUpperCase()}.\n\nYou can track your delivery for more information.`;
-
+    // Create notifications
     try {
+      const userNotification = new Notification({
+        userId: delivery.userId._id,
+        message: `📊 Your delivery status has been updated to: ${newStatus.replace('_', ' ')}`,
+        type: 'status_update',
+        deliveryId: delivery._id
+      });
+      await userNotification.save();
+
+      // Send email notification
+      const subject = `📦 Delivery Status Update: ${newStatus.replace('_', ' ').toUpperCase()}`;
+      const message = `Hello ${delivery.userId.name},\n\nYour delivery (Tracking ID: ${delivery.trackingId}) status has been updated to: ${newStatus.replace('_', ' ').toUpperCase()}.\n\nYou can track your delivery for more information.`;
+
       await sendEmail(delivery.userId.email, subject, message);
-    } catch (emailErr) {
-      console.error(`❌ Failed to send status update email:`, emailErr.message);
+    } catch (notificationErr) {
+      console.error('Failed to send notification/email:', notificationErr);
+      // Don't fail the main request if notification fails
     }
 
-    res.status(200).json({ message: `✅ Status updated to ${newStatus}` });
-  } catch (err) {
-    console.error('❌ Error updating status:', err.message);
-    res.status(500).json({ error: 'Failed to update status' });
+    res.status(200).json({ 
+      message: `✅ Status updated to ${newStatus}`,
+      delivery: {
+        _id: delivery._id,
+        status: delivery.status,
+        updatedAt: delivery.updatedAt
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error updating delivery status:', error);
+    res.status(500).json({ 
+      error: 'Failed to update delivery status',
+      details: error.message 
+    });
   }
 });
 
@@ -335,7 +583,11 @@ router.patch('/complete/:id', authorizeRoles('admin', 'agent'), async (req, res)
     }
 
     delivery.status = 'delivered';
-    delivery.statusUpdates.push({ status: 'delivered', timestamp: new Date() });
+    delivery.statusUpdates.push({ 
+      status: 'delivered', 
+      timestamp: new Date(),
+      updatedBy: req.user._id 
+    });
     await delivery.save();
 
     // Notify user
@@ -377,13 +629,20 @@ router.patch('/cancel/:id', async (req, res) => {
     }
 
     delivery.status = 'cancelled';
-    delivery.statusUpdates.push({ status: 'cancelled', timestamp: new Date(), cancelledBy });
+    delivery.statusUpdates.push({ 
+      status: 'cancelled', 
+      timestamp: new Date(), 
+      cancelledBy,
+      updatedBy: req.user._id 
+    });
     await delivery.save();
 
     if (delivery.assignedAgent) {
       const notifyAgent = new Notification({
         userId: delivery.assignedAgent,
-        message: `⚠️ Delivery has been cancelled: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`
+        message: `⚠️ Delivery has been cancelled: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`,
+        type: 'cancellation',
+        deliveryId: delivery._id
       });
       await notifyAgent.save();
     }

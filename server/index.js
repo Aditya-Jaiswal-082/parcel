@@ -49,6 +49,10 @@ app.use('/api', distanceRoutes);
 const adminRoutes = require('./routes/admin');
 app.use('/api/admin', adminRoutes);
 
+
+const agentRoutes = require('./routes/agent');
+app.use('/api/agent', agentRoutes);
+
 // ======= Error Handling Middleware (optional) =======
 app.use((err, req, res, next) => {
   console.error('❌ Internal Error:', err.stack);
