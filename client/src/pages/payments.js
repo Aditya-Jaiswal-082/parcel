@@ -20,6 +20,7 @@ function Payments() {
   const [orderSummary, setOrderSummary] = useState(null);
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [pricingBreakdown, setPricingBreakdown] = useState(null);
 
   const hasSubmitted = useRef(false);
   const progressInterval = useRef(null);
@@ -58,6 +59,77 @@ function Payments() {
     return Math.ceil(baseTime + travelTime);
   };
 
+  // ✅ FIXED: Enhanced pricing calculation matching AddToCart.js
+  const calculateDetailedPrice = (distance) => {
+    if (!order) return null;
+
+    // For same building delivery, set minimum distance
+    let finalDistance = parseFloat(distance);
+    if (order.sameBuildingDelivery) {
+      finalDistance = Math.max(finalDistance, 0.1); // Minimum 0.1 km for same building
+    }
+
+    const baseCharge = 25;
+    const perKmRate = 10;
+    const distanceCharge = finalDistance * perKmRate;
+    
+    // Weight ranges with pricing (matching AddToCart)
+    const weightRanges = {
+      '0-1': { charge: 0 },
+      '1-3': { charge: 20 },
+      '3-5': { charge: 40 },
+      '5-10': { charge: 80 },
+      '10+': { charge: 150 }
+    };
+    
+    const weightCharge = weightRanges[order.packageWeight]?.charge || 0;
+    
+    // Urgency multiplier
+    const urgencyMultiplier = order.urgency === 'express' ? 1.5 : 1;
+    
+    // Additional charges
+    const fragileCharge = order.fragile ? 25 : 0;
+    const signatureCharge = order.requiresSignature ? 15 : 0;
+    
+    // Packaging options with pricing
+    const packagingOptions = {
+      'small': { charge: 15 },
+      'medium': { charge: 25 },
+      'large': { charge: 40 },
+      'extra-large': { charge: 60 }
+    };
+    
+    const packagingCharge = order.requiresPackaging ? 
+      packagingOptions[order.packagingType]?.charge || 0 : 0;
+    
+    // Same building delivery discount
+    const sameBuildingDiscount = order.sameBuildingDelivery ? 10 : 0;
+    
+    // Calculate subtotal before urgency multiplier
+    const subtotal = baseCharge + distanceCharge + weightCharge - sameBuildingDiscount;
+    const urgencyCharge = order.urgency === 'express' ? Math.round(subtotal * 0.5) : 0;
+    
+    // Total calculation
+    const total = Math.round(Math.max(30, subtotal + urgencyCharge + fragileCharge + signatureCharge + packagingCharge));
+
+    return {
+      baseCharge,
+      distance: finalDistance.toFixed(2),
+      distanceCharge: Math.round(distanceCharge),
+      weightRange: weightRanges[order.packageWeight] ? `${order.packageWeight} kg` : '0-1 kg',
+      weightCharge,
+      urgencyLabel: order.urgency === 'express' ? 'Express (50% extra)' : 'Standard',
+      urgencyCharge,
+      fragileCharge,
+      signatureCharge,
+      packagingCharge,
+      packagingType: order.requiresPackaging ? packagingOptions[order.packagingType]?.label : null,
+      sameBuildingDiscount,
+      subtotal: Math.max(30, subtotal),
+      total
+    };
+  };
+
   // Enhanced error handling
   const handleError = (errorMsg, stage = 'error') => {
     setError(errorMsg);
@@ -94,6 +166,15 @@ function Payments() {
       return false;
     }
 
+    // ✅ FIXED: Check if pricing data is already available from AddToCart
+    if (order.estimatedPrice && order.estimatedDistance && order.pricingBreakdown) {
+      console.log('Using pricing from AddToCart:', order.estimatedPrice);
+      setPrice(order.estimatedPrice);
+      setDistanceKm(order.estimatedDistance);
+      setPricingBreakdown(order.pricingBreakdown);
+      return true;
+    }
+
     const {
       userId, pickupAddress, deliveryAddress, pickupCoordinates,
       deliveryCoordinates, description, contactNumber, deliveryDate
@@ -121,7 +202,7 @@ function Payments() {
     return true;
   };
 
-  // ✅ Fixed: Use useCallback to memoize the function and prevent unnecessary re-renders
+  // ✅ FIXED: Updated calculation function to use AddToCart pricing if available
   const calculateDistanceAndSubmit = useCallback(async () => {
     if (hasSubmitted.current) return;
     hasSubmitted.current = true;
@@ -130,7 +211,41 @@ function Payments() {
       // Stage 1: Validation
       if (!validateOrder()) return;
 
-      // Stage 2: Distance Calculation
+      // ✅ If pricing is already calculated in AddToCart, use it directly
+      if (order.estimatedPrice && order.estimatedDistance && order.pricingBreakdown) {
+        console.log('✅ Using pre-calculated pricing from AddToCart');
+        
+        setDistanceKm(order.estimatedDistance);
+        setPrice(order.estimatedPrice);
+        setPricingBreakdown(order.pricingBreakdown);
+        setEstimatedTime(calculateEstimatedTime(parseFloat(order.estimatedDistance)));
+
+        // Skip to payment stage
+        setTimeout(() => {
+          setProcessingStage('payment');
+          animateProgress(stages.payment.progress);
+          
+          // Create order summary
+          setOrderSummary({
+            distance: order.estimatedDistance,
+            price: order.estimatedPrice,
+            estimatedTime: calculateEstimatedTime(parseFloat(order.estimatedDistance)),
+            pickupAddress: order.additionalInfoPickup ? 
+              `${order.pickupAddress}, ${order.additionalInfoPickup}` : order.pickupAddress,
+            deliveryAddress: order.additionalInfoDelivery ? 
+              `${order.deliveryAddress}, ${order.additionalInfoDelivery}` : order.deliveryAddress,
+            description: order.description,
+            deliveryDate: order.deliveryDate,
+            pricingBreakdown: order.pricingBreakdown
+          });
+          
+          setShowPaymentOptions(true);
+        }, 2000);
+        
+        return;
+      }
+
+      // Stage 2: Distance Calculation (only if not pre-calculated)
       setTimeout(() => {
         setProcessingStage('calculating');
         animateProgress(stages.calculating.progress);
@@ -158,20 +273,17 @@ function Payments() {
             }
 
             const distanceInMeters = element.distance.value;
-            // ✅ Fixed: Remove unused variable 'durationInSeconds'
-            // const durationInSeconds = element.duration.value;
             const distanceInKm = distanceInMeters / 1000;
             
-            // Enhanced pricing calculation
-            const baseFare = 25;
-            const perKmRate = 12;
-            const calculatedPrice = baseFare + (distanceInKm * perKmRate);
+            // ✅ FIXED: Use enhanced pricing calculation
+            const pricingDetails = calculateDetailedPrice(distanceInKm);
+            const calculatedPrice = pricingDetails.total;
             
             const estimatedMinutes = calculateEstimatedTime(distanceInKm);
 
-            // ✅ Fixed: Use the state variables properly
             setDistanceKm(distanceInKm.toFixed(2));
-            setPrice(calculatedPrice.toFixed(2));
+            setPrice(calculatedPrice);
+            setPricingBreakdown(pricingDetails);
             setEstimatedTime(estimatedMinutes);
 
             // Stage 3: Creating order
@@ -192,20 +304,41 @@ function Payments() {
                 description,
                 contactNumber,
                 deliveryDate,
-                price: calculatedPrice.toFixed(2),
-                distance: distanceInKm.toFixed(2),
-                estimatedTime: estimatedMinutes
+                price: calculatedPrice,
+                estimatedPrice: calculatedPrice,
+                estimatedDistance: distanceInKm.toFixed(2),
+                estimatedTime: estimatedMinutes,
+                pricingBreakdown: pricingDetails,
+                // Include all enhanced fields from AddToCart
+                senderName: order.senderName,
+                recipientName: order.recipientName,
+                recipientContact: order.recipientContact,
+                deliveryTime: order.deliveryTime,
+                packageType: order.packageType,
+                packageWeight: order.packageWeight,
+                urgency: order.urgency,
+                fragile: order.fragile,
+                requiresSignature: order.requiresSignature,
+                specialInstructions: order.specialInstructions,
+                additionalInfoPickup: order.additionalInfoPickup,
+                additionalInfoDelivery: order.additionalInfoDelivery,
+                requiresPackaging: order.requiresPackaging,
+                packagingType: order.packagingType,
+                sameBuildingDelivery: order.sameBuildingDelivery,
+                pickupUnit: order.pickupUnit,
+                deliveryUnit: order.deliveryUnit
               };
 
               // Create order summary
               setOrderSummary({
                 distance: distanceInKm.toFixed(2),
-                price: calculatedPrice.toFixed(2),
+                price: calculatedPrice,
                 estimatedTime: estimatedMinutes,
                 pickupAddress: payload.pickupAddress,
                 deliveryAddress: payload.deliveryAddress,
                 description,
-                deliveryDate
+                deliveryDate,
+                pricingBreakdown: pricingDetails
               });
 
               try {
@@ -252,7 +385,7 @@ function Payments() {
       console.error("❌ Error during process:", err.message);
       handleError("Unexpected error occurred. Please try again later.");
     }
-  }, [order, navigate, retryCount, stages.calculating.progress, stages.validating.progress]); // ✅ Fixed: Added all dependencies
+  }, [order, navigate, retryCount, stages.calculating.progress, stages.validating.progress, stages.payment.progress]);
 
   // Handle payment confirmation
   const handlePaymentConfirm = () => {
@@ -269,7 +402,6 @@ function Payments() {
     }, 2000);
   };
 
-  // ✅ Fixed: Added calculateDistanceAndSubmit to the dependency array
   useEffect(() => {
     if (window.google && window.google.maps) {
       calculateDistanceAndSubmit();
@@ -287,7 +419,7 @@ function Payments() {
         clearInterval(progressInterval.current);
       }
     };
-  }, [calculateDistanceAndSubmit]); // ✅ Fixed: Added dependency
+  }, [calculateDistanceAndSubmit]);
 
   // Render loading animation
   const renderLoadingAnimation = () => (
@@ -321,7 +453,7 @@ function Payments() {
     </div>
   );
 
-  // Render order summary
+  // ✅ FIXED: Enhanced order summary with pricing breakdown
   const renderOrderSummary = () => (
     <div className="order-summary">
       <h3>📋 Order Summary</h3>
@@ -345,6 +477,58 @@ function Payments() {
         <span className="label">⏱️ Est. Time:</span>
         <span className="value">{orderSummary.estimatedTime} minutes</span>
       </div>
+
+      {/* ✅ NEW: Show detailed pricing breakdown if available */}
+      {orderSummary.pricingBreakdown && (
+        <div className="pricing-breakdown">
+          <h4>💰 Pricing Details</h4>
+          <div className="breakdown-item">
+            <span>Base Charge:</span>
+            <span>₹{orderSummary.pricingBreakdown.baseCharge}</span>
+          </div>
+          <div className="breakdown-item">
+            <span>Distance ({orderSummary.pricingBreakdown.distance} km):</span>
+            <span>₹{orderSummary.pricingBreakdown.distanceCharge}</span>
+          </div>
+          {orderSummary.pricingBreakdown.weightCharge > 0 && (
+            <div className="breakdown-item">
+              <span>Weight ({orderSummary.pricingBreakdown.weightRange}):</span>
+              <span>₹{orderSummary.pricingBreakdown.weightCharge}</span>
+            </div>
+          )}
+          {orderSummary.pricingBreakdown.urgencyCharge > 0 && (
+            <div className="breakdown-item">
+              <span>{orderSummary.pricingBreakdown.urgencyLabel}:</span>
+              <span>₹{orderSummary.pricingBreakdown.urgencyCharge}</span>
+            </div>
+          )}
+          {orderSummary.pricingBreakdown.packagingCharge > 0 && (
+            <div className="breakdown-item">
+              <span>Packaging:</span>
+              <span>₹{orderSummary.pricingBreakdown.packagingCharge}</span>
+            </div>
+          )}
+          {orderSummary.pricingBreakdown.fragileCharge > 0 && (
+            <div className="breakdown-item">
+              <span>Fragile Handling:</span>
+              <span>₹{orderSummary.pricingBreakdown.fragileCharge}</span>
+            </div>
+          )}
+          {orderSummary.pricingBreakdown.signatureCharge > 0 && (
+            <div className="breakdown-item">
+              <span>Signature Required:</span>
+              <span>₹{orderSummary.pricingBreakdown.signatureCharge}</span>
+            </div>
+          )}
+          {orderSummary.pricingBreakdown.sameBuildingDiscount > 0 && (
+            <div className="breakdown-item discount">
+              <span>Same Building Discount:</span>
+              <span>-₹{orderSummary.pricingBreakdown.sameBuildingDiscount}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="summary-item total">
         <span className="label">💰 Total:</span>
         <span className="value">₹{orderSummary.price}</span>
@@ -461,7 +645,6 @@ function Payments() {
                 </div>
               )}
               
-              {/* ✅ Fixed: Now properly display the calculated values */}
               {distanceKm && price && estimatedTime && (
                 <div className="calculation-display">
                   <p>📏 Distance: {distanceKm} km</p>

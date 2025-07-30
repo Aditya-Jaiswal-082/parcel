@@ -1,5 +1,16 @@
-// Fix the agent stats route - replace the existing one
-router.get('/agent/stats/:agentId', authorizeRoles('agent', 'admin'), async (req, res) => {
+// routes/agent.js - Complete file with proper setup
+const express = require('express');
+const mongoose = require('mongoose');
+const router = express.Router(); // This line was missing!
+const { authenticate, authorizeRoles } = require('../middleware/authMiddleware');
+
+const Delivery = require('../models/Delivery');
+
+// Apply authentication to all routes
+router.use(authenticate);
+
+// GET /api/agent/stats/:agentId - Get agent statistics
+router.get('/stats/:agentId', authorizeRoles('agent', 'admin'), async (req, res) => {
   try {
     const { agentId } = req.params;
     
@@ -30,51 +41,62 @@ router.get('/agent/stats/:agentId', authorizeRoles('agent', 'admin'), async (req
 
     // Get total assigned deliveries for this agent
     const totalAssigned = await Delivery.countDocuments({ 
-      assignedAgent: agentId, // Use string instead of ObjectId
+      assignedAgent: agentId,
       status: { $in: ['assigned', 'picked_up', 'in_transit'] }
     });
 
     // Get completed deliveries today
     const completedToday = await Delivery.countDocuments({
-      assignedAgent: agentId, // Use string instead of ObjectId
+      assignedAgent: agentId,
       status: 'delivered',
       updatedAt: { $gte: today, $lt: tomorrow }
     });
 
-    // Calculate today's earnings - FIXED VERSION
-    const earningsResult = await Delivery.aggregate([
-      {
-        $match: {
-          assignedAgent: new mongoose.Types.ObjectId(agentId), // Fixed ObjectId conversion
-          status: 'delivered',
-          updatedAt: { $gte: today, $lt: tomorrow }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalEarnings: { 
-            $sum: { 
-              $toDouble: { 
-                $ifNull: [
-                  { $ifNull: ['$estimatedPrice', '$price'] }, 
-                  0
-                ] 
+    // Calculate today's earnings with fallback
+    let todaysEarnings = 0;
+    
+    try {
+      const earningsResult = await Delivery.aggregate([
+        {
+          $match: {
+            assignedAgent: new mongoose.Types.ObjectId(agentId),
+            status: 'delivered',
+            updatedAt: { $gte: today, $lt: tomorrow }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalEarnings: { 
+              $sum: { 
+                $toDouble: { 
+                  $ifNull: [
+                    { $ifNull: ['$estimatedPrice', '$price'] }, 
+                    0
+                  ] 
+                } 
               } 
-            } 
+            }
           }
         }
-      }
-    ]);
+      ]);
 
-    const todaysEarnings = earningsResult.length > 0 ? earningsResult[0].totalEarnings : 0;
-
-    console.log('Agent stats calculated:', {
-      totalAvailable,
-      totalAssigned,
-      completedToday,
-      earnings: Math.round(todaysEarnings)
-    });
+      todaysEarnings = earningsResult.length > 0 ? earningsResult[0].totalEarnings : 0;
+    } catch (aggregationError) {
+      console.error('Aggregation error, using fallback:', aggregationError);
+      
+      // Fallback calculation
+      const deliveredToday = await Delivery.find({
+        assignedAgent: agentId,
+        status: 'delivered',
+        updatedAt: { $gte: today, $lt: tomorrow }
+      }).select('estimatedPrice price');
+      
+      todaysEarnings = deliveredToday.reduce((total, delivery) => {
+        const price = delivery.estimatedPrice || delivery.price || 0;
+        return total + parseFloat(price);
+      }, 0);
+    }
 
     res.status(200).json({
       totalAvailable,
@@ -91,3 +113,5 @@ router.get('/agent/stats/:agentId', authorizeRoles('agent', 'admin'), async (req
     });
   }
 });
+
+module.exports = router; 

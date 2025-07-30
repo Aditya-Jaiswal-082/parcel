@@ -36,7 +36,7 @@ router.get('/track/:trackingId', async (req, res) => {
 // ✅ AUTHENTICATED ROUTES
 router.use(authenticate); // Apply authentication to all routes below
 
-// ✅ Get agent statistics
+// ✅ FIXED: Get agent statistics with proper ObjectId handling
 router.get('/agent/stats/:agentId', authorizeRoles('agent', 'admin'), async (req, res) => {
   try {
     const { agentId } = req.params;
@@ -44,6 +44,11 @@ router.get('/agent/stats/:agentId', authorizeRoles('agent', 'admin'), async (req
     // Verify the agent is requesting their own stats (unless admin)
     if (req.user.role === 'agent' && req.user._id.toString() !== agentId) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(agentId)) {
+      return res.status(400).json({ error: 'Invalid agent ID' });
     }
     
     // Get current date for today's stats
@@ -74,28 +79,58 @@ router.get('/agent/stats/:agentId', authorizeRoles('agent', 'admin'), async (req
       updatedAt: { $gte: today, $lt: tomorrow }
     });
 
-    // Calculate today's earnings
-    const earningsResult = await Delivery.aggregate([
-      {
-        $match: {
-          assignedAgent: mongoose.Types.ObjectId(agentId),
-          status: 'delivered',
-          updatedAt: { $gte: today, $lt: tomorrow }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalEarnings: { 
-            $sum: { 
-              $toDouble: { $ifNull: ['$estimatedPrice', '$price', 0] } 
-            } 
+    // ✅ FIXED: Calculate today's earnings with proper ObjectId conversion
+    let todaysEarnings = 0;
+    
+    try {
+      const earningsResult = await Delivery.aggregate([
+        {
+          $match: {
+            assignedAgent: new mongoose.Types.ObjectId(agentId), // Fixed ObjectId conversion
+            status: 'delivered',
+            updatedAt: { $gte: today, $lt: tomorrow }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalEarnings: { 
+              $sum: { 
+                $toDouble: { 
+                  $ifNull: [
+                    { $ifNull: ['$estimatedPrice', '$price'] }, 
+                    0
+                  ] 
+                } 
+              } 
+            }
           }
         }
-      }
-    ]);
+      ]);
 
-    const todaysEarnings = earningsResult.length > 0 ? earningsResult[0].totalEarnings : 0;
+      todaysEarnings = earningsResult.length > 0 ? earningsResult[0].totalEarnings : 0;
+    } catch (aggregationError) {
+      console.error('Aggregation error, using fallback calculation:', aggregationError);
+      
+      // Fallback: Simple calculation without aggregation
+      const deliveredToday = await Delivery.find({
+        assignedAgent: agentId,
+        status: 'delivered',
+        updatedAt: { $gte: today, $lt: tomorrow }
+      }).select('estimatedPrice price');
+      
+      todaysEarnings = deliveredToday.reduce((total, delivery) => {
+        const price = delivery.estimatedPrice || delivery.price || 0;
+        return total + parseFloat(price);
+      }, 0);
+    }
+
+    console.log('Agent stats calculated:', {
+      totalAvailable,
+      totalAssigned,
+      completedToday,
+      earnings: Math.round(todaysEarnings)
+    });
 
     res.status(200).json({
       totalAvailable,
@@ -106,7 +141,10 @@ router.get('/agent/stats/:agentId', authorizeRoles('agent', 'admin'), async (req
 
   } catch (error) {
     console.error('Error fetching agent stats:', error);
-    res.status(500).json({ error: 'Failed to fetch agent statistics' });
+    res.status(500).json({ 
+      error: 'Failed to fetch agent statistics',
+      details: error.message 
+    });
   }
 });
 
@@ -220,14 +258,17 @@ router.post('/create', authorizeRoles('user', 'admin'), async (req, res) => {
         console.error(`❌ Email error to ${user.email}:`, emailErr.message);
       }
 
-      const notification = new Notification({
-        userId: user._id,
-        message: `📦 New delivery created: ${pickupAddress} → ${deliveryAddress} (${trackingId})`,
-        type: 'delivery',
-        deliveryId: newDelivery._id
-      });
-
-      await notification.save();
+      try {
+        const notification = new Notification({
+          userId: user._id,
+          message: `📦 New delivery created: ${pickupAddress} → ${deliveryAddress} (${trackingId})`,
+          type: 'delivery',
+          deliveryId: newDelivery._id
+        });
+        await notification.save();
+      } catch (notificationErr) {
+        console.error('Failed to create notification:', notificationErr);
+      }
     }
 
     // Notify user about successful creation
@@ -384,13 +425,17 @@ router.post('/assign/:id', authorizeRoles('admin'), async (req, res) => {
     await delivery.save();
 
     // Notify agent (in-app)
-    const notification = new Notification({
-      userId: agentId,
-      message: `📦 You have been assigned a new delivery: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`,
-      type: 'assignment',
-      deliveryId: delivery._id
-    });
-    await notification.save();
+    try {
+      const notification = new Notification({
+        userId: agentId,
+        message: `📦 You have been assigned a new delivery: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`,
+        type: 'assignment',
+        deliveryId: delivery._id
+      });
+      await notification.save();
+    } catch (notificationErr) {
+      console.error('Failed to create agent notification:', notificationErr);
+    }
 
     // Notify user (email)
     const subject = '📦 Delivery Assigned';
@@ -410,7 +455,7 @@ router.post('/assign/:id', authorizeRoles('admin'), async (req, res) => {
   }
 });
 
-// Agent claims delivery
+// ✅ FIXED: Agent claims delivery with better error handling
 router.patch('/claim/:id', authorizeRoles('agent'), async (req, res) => {
   try {
     const { agentId } = req.body;
@@ -446,23 +491,28 @@ router.patch('/claim/:id', authorizeRoles('agent'), async (req, res) => {
     });
     await delivery.save();
 
-    // Create notifications
-    const agentNotification = new Notification({
-      userId: requestingAgentId,
-      message: `✅ You successfully claimed delivery: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`,
-      type: 'assignment',
-      deliveryId: delivery._id
-    });
-    await agentNotification.save();
+    // Create notifications with error handling
+    try {
+      const agentNotification = new Notification({
+        userId: requestingAgentId,
+        message: `✅ You successfully claimed delivery: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`,
+        type: 'assignment',
+        deliveryId: delivery._id
+      });
+      await agentNotification.save();
 
-    // Notify user about assignment
-    const userNotification = new Notification({
-      userId: delivery.userId._id,
-      message: `📦 Your delivery has been assigned to an agent and will be picked up soon.`,
-      type: 'assignment',
-      deliveryId: delivery._id
-    });
-    await userNotification.save();
+      // Notify user about assignment
+      const userNotification = new Notification({
+        userId: delivery.userId._id,
+        message: `📦 Your delivery has been assigned to an agent and will be picked up soon.`,
+        type: 'assignment',
+        deliveryId: delivery._id
+      });
+      await userNotification.save();
+    } catch (notificationErr) {
+      console.error('Failed to create notifications:', notificationErr);
+      // Don't fail the main request if notifications fail
+    }
 
     res.status(200).json({ 
       message: '✅ Delivery successfully claimed',
@@ -479,7 +529,7 @@ router.patch('/claim/:id', authorizeRoles('agent'), async (req, res) => {
   }
 });
 
-// Update delivery status (agents and admin)
+// ✅ FIXED: Update delivery status with enhanced error handling
 router.patch('/update-status/:deliveryId', authorizeRoles('admin', 'agent'), async (req, res) => {
   try {
     const { deliveryId } = req.params;
@@ -533,7 +583,7 @@ router.patch('/update-status/:deliveryId', authorizeRoles('admin', 'agent'), asy
     
     console.log('✅ Status updated successfully to:', newStatus);
 
-    // Create notifications
+    // Create notifications with error handling
     try {
       const userNotification = new Notification({
         userId: delivery.userId._id,
@@ -545,9 +595,9 @@ router.patch('/update-status/:deliveryId', authorizeRoles('admin', 'agent'), asy
 
       // Send email notification
       const subject = `📦 Delivery Status Update: ${newStatus.replace('_', ' ').toUpperCase()}`;
-      const message = `Hello ${delivery.userId.name},\n\nYour delivery (Tracking ID: ${delivery.trackingId}) status has been updated to: ${newStatus.replace('_', ' ').toUpperCase()}.\n\nYou can track your delivery for more information.`;
+      const emailMessage = `Hello ${delivery.userId.name},\n\nYour delivery (Tracking ID: ${delivery.trackingId}) status has been updated to: ${newStatus.replace('_', ' ').toUpperCase()}.\n\nYou can track your delivery for more information.`;
 
-      await sendEmail(delivery.userId.email, subject, message);
+      await sendEmail(delivery.userId.email, subject, emailMessage);
     } catch (notificationErr) {
       console.error('Failed to send notification/email:', notificationErr);
       // Don't fail the main request if notification fails
@@ -637,20 +687,30 @@ router.patch('/cancel/:id', async (req, res) => {
     });
     await delivery.save();
 
+    // Notify agent with error handling
     if (delivery.assignedAgent) {
-      const notifyAgent = new Notification({
-        userId: delivery.assignedAgent,
-        message: `⚠️ Delivery has been cancelled: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`,
-        type: 'cancellation',
-        deliveryId: delivery._id
-      });
-      await notifyAgent.save();
+      try {
+        const notifyAgent = new Notification({
+          userId: delivery.assignedAgent,
+          message: `⚠️ Delivery has been cancelled: ${delivery.pickupAddress} → ${delivery.deliveryAddress}`,
+          type: 'cancellation',
+          deliveryId: delivery._id
+        });
+        await notifyAgent.save();
+      } catch (notificationErr) {
+        console.error('Failed to notify agent about cancellation:', notificationErr);
+      }
     }
 
     if (delivery.userId?.email) {
       const subject = '⚠️ Delivery Cancelled';
       const message = `Your delivery (Tracking ID: ${delivery.trackingId}) was cancelled by the ${cancelledBy}.\n\nIf you have questions, please reach out to our support team.`;
-      await sendEmail(delivery.userId.email, subject, message);
+      
+      try {
+        await sendEmail(delivery.userId.email, subject, message);
+      } catch (emailErr) {
+        console.error('Failed to send cancellation email:', emailErr);
+      }
     }
 
     res.status(200).json({ message: `✅ Delivery cancelled by ${cancelledBy}` });
@@ -674,7 +734,12 @@ router.delete('/admin-delete/:id', authorizeRoles('admin'), async (req, res) => 
     if (email) {
       const subject = '❌ Delivery Cancelled by Admin';
       const message = `Your delivery (${trackingId}) has been cancelled by the admin.\n\nIf you believe this was a mistake or need help, please contact support.`;
-      await sendEmail(email, subject, message);
+      
+      try {
+        await sendEmail(email, subject, message);
+      } catch (emailErr) {
+        console.error('Failed to send deletion email:', emailErr);
+      }
     }
 
     res.status(200).json({ message: '✅ Delivery deleted and user notified' });

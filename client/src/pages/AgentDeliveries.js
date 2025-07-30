@@ -1,62 +1,55 @@
-// src/pages/Cart.js
+// src/pages/AgentDeliveries.js
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import './Cart.css';
-
-function Cart() {
+import './AgentDeliveries.css';
+function AgentDeliveries() {
   const navigate = useNavigate();
-  const location = useLocation();
   
   // State management
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('createdAt');
+  const [filter, setFilter] = useState('active');
+  const [sortBy, setSortBy] = useState('assignedAt');
   const [sortOrder, setSortOrder] = useState('desc');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDeliveries, setSelectedDeliveries] = useState([]);
   const [showDetails, setShowDetails] = useState({});
+  const [updatingStatus, setUpdatingStatus] = useState(null);
   const [stats, setStats] = useState({
     total: 0,
-    pending: 0,
+    assigned: 0,
+    pickedUp: 0,
+    inTransit: 0,
     delivered: 0,
-    cancelled: 0,
-    totalSpent: 0
+    todayEarnings: 0
   });
   const [refreshing, setRefreshing] = useState(false);
 
   // User authentication
-  const userId = localStorage.getItem('userId');
+  const agentId = localStorage.getItem('userId');
   const token = localStorage.getItem('token');
   const userRole = localStorage.getItem('role');
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  // Check authentication
+  // Check authentication and role
   useEffect(() => {
-    if (!token || !userId) {
-      alert('🔐 Please login to view your deliveries');
+    if (!token || !agentId) {
+      alert('🔐 Please login to access your deliveries');
       navigate('/login');
       return;
     }
 
-    if (userRole === 'agent') {
-      alert('🚫 Access Denied: Use the Agent Dashboard to view deliveries');
-      navigate('/agent-dashboard');
+    if (userRole !== 'agent') {
+      alert('🚫 Access Denied: This page is only for delivery agents');
+      navigate('/dashboard');
       return;
     }
 
-    // Check for success message from payments
-    if (location.state?.message) {
-      setTimeout(() => {
-        alert(`✅ ${location.state.message}`);
-      }, 500);
-    }
-
     fetchDeliveries();
-  }, [userId, token, userRole, navigate, location.state]);
+  }, [agentId, token, userRole, navigate]);
 
-  // Enhanced fetch deliveries with statistics
+  // Fetch assigned deliveries
   const fetchDeliveries = useCallback(async (showLoadingSpinner = true) => {
     try {
       if (showLoadingSpinner) {
@@ -67,7 +60,7 @@ function Cart() {
       
       setError(null);
 
-      const res = await axios.get(`http://localhost:5000/api/delivery/user/${userId}`, {
+      const res = await axios.get(`http://localhost:5000/api/delivery/assigned/${agentId}`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -78,13 +71,19 @@ function Cart() {
       setDeliveries(deliveriesData);
       
       // Calculate statistics
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
       const statistics = {
         total: deliveriesData.length,
-        pending: deliveriesData.filter(d => ['pending', 'created', 'assigned', 'picked_up', 'in_transit'].includes(d.status)).length,
+        assigned: deliveriesData.filter(d => d.status === 'assigned').length,
+        pickedUp: deliveriesData.filter(d => d.status === 'picked_up').length,
+        inTransit: deliveriesData.filter(d => d.status === 'in_transit').length,
         delivered: deliveriesData.filter(d => d.status === 'delivered').length,
-        cancelled: deliveriesData.filter(d => d.status === 'cancelled').length,
-        totalSpent: deliveriesData
-          .filter(d => d.status === 'delivered')
+        todayEarnings: deliveriesData
+          .filter(d => d.status === 'delivered' && new Date(d.updatedAt) >= today && new Date(d.updatedAt) < tomorrow)
           .reduce((sum, d) => sum + parseFloat(d.estimatedPrice || d.price || 0), 0)
       };
       
@@ -102,7 +101,7 @@ function Cart() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userId, token, navigate]);
+  }, [agentId, token, navigate]);
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -113,96 +112,74 @@ function Cart() {
     return () => clearInterval(interval);
   }, [fetchDeliveries]);
 
-  // Enhanced cancel delivery
-  const handleCancel = async (delivery) => {
-    const confirmMessage = `🚫 Cancel this delivery?\n\n` +
-      `Tracking ID: ${delivery.trackingId}\n` +
-      `From: ${delivery.pickupAddress}\n` +
-      `To: ${delivery.deliveryAddress}\n` +
-      `Amount: ₹${delivery.estimatedPrice || delivery.price}\n\n` +
-      `This action cannot be undone.`;
+  // Update delivery status
+  const updateStatus = async (deliveryId, newStatus, currentStatus) => {
+    if (updatingStatus === deliveryId) return;
 
-    if (!window.confirm(confirmMessage)) return;
+    const statusMessages = {
+      'picked_up': 'Mark as picked up from sender?',
+      'in_transit': 'Mark as in transit to destination?',
+      'delivered': 'Confirm delivery completion?'
+    };
+
+    const confirmMessage = statusMessages[newStatus] || `Update status to ${newStatus}?`;
+    if (!window.confirm(`🔄 ${confirmMessage}`)) return;
+
+    setUpdatingStatus(deliveryId);
+    setError(null);
 
     try {
-      setLoading(true);
-      
-      await axios.patch(`http://localhost:5000/api/delivery/cancel/${delivery._id}`, {
-        cancelledBy: 'user'
-      }, {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      const response = await axios.patch(
+        `http://localhost:5000/api/delivery/update-status/${deliveryId}`, 
+        { 
+          newStatus,
+          agentId,
+          timestamp: new Date().toISOString()
+        },
+        {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
-      });
+      );
 
-      alert('✅ Delivery cancelled successfully! You will receive a confirmation email.');
-      await fetchDeliveries();
-      
+      if (response.status === 200) {
+        alert(`✅ Status updated to "${newStatus}" successfully!`);
+        await fetchDeliveries(false);
+      }
     } catch (err) {
-      console.error("Error cancelling delivery:", err);
-      const errorMsg = err.response?.data?.error || 'Could not cancel delivery. Please try again.';
-      alert(`❌ ${errorMsg}`);
+      console.error('Error updating status:', err);
+      const errorMessage = err.response?.data?.error || 'Failed to update status. Please try again.';
+      alert(`❌ ${errorMessage}`);
     } finally {
-      setLoading(false);
+      setUpdatingStatus(null);
     }
   };
 
-  // Track delivery
-  const handleTrack = (trackingId) => {
-    navigate(`/track/${trackingId}`);
+  // Get contact info for customer
+  const handleContact = (delivery) => {
+    const contactInfo = `📞 Customer Contact Information:\n\n` +
+      `Sender: ${delivery.senderName || 'Not provided'}\n` +
+      `Phone: ${delivery.contactNumber}\n` +
+      `Recipient: ${delivery.recipientName || 'Same as sender'}\n` +
+      `Recipient Phone: ${delivery.recipientContact || delivery.contactNumber}\n\n` +
+      `Special Instructions: ${delivery.specialInstructions || 'None'}`;
+    
+    alert(contactInfo);
   };
 
-  // Repeat order
-  const handleRepeatOrder = (delivery) => {
-    const orderData = {
-      pickupAddress: delivery.pickupAddress,
-      deliveryAddress: delivery.deliveryAddress,
-      description: delivery.description,
-      contactNumber: delivery.contactNumber,
-      pickupCoordinates: delivery.pickupLocation,
-      deliveryCoordinates: delivery.deliveryLocation,
-      // Enhanced fields
-      senderName: delivery.senderName,
-      recipientName: delivery.recipientName,
-      recipientContact: delivery.recipientContact,
-      deliveryTime: delivery.deliveryTime,
-      packageType: delivery.packageType,
-      packageWeight: delivery.packageWeight,
-      urgency: delivery.urgency,
-      fragile: delivery.fragile,
-      requiresSignature: delivery.requiresSignature,
-      specialInstructions: delivery.specialInstructions,
-      additionalInfoPickup: delivery.additionalInfoPickup,
-      additionalInfoDelivery: delivery.additionalInfoDelivery,
-      requiresPackaging: delivery.requiresPackaging,
-      packagingType: delivery.packagingType,
-      sameBuildingDelivery: delivery.sameBuildingDelivery,
-      userId: userId
-    };
-
-    navigate('/addtocart', { state: { repeatOrder: orderData } });
-  };
-
-  // Download invoice/receipt
-  const handleDownloadReceipt = async (delivery) => {
-    try {
-      const response = await axios.get(`http://localhost:5000/api/delivery/receipt/${delivery._id}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-        responseType: 'blob'
-      });
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `receipt-${delivery.trackingId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Error downloading receipt:", err);
-      alert('❌ Could not download receipt. Feature coming soon!');
+  // Get directions to pickup/delivery location
+  const handleDirections = (delivery, type = 'pickup') => {
+    const location = type === 'pickup' ? delivery.pickupLocation : delivery.deliveryLocation;
+    const address = type === 'pickup' ? delivery.pickupAddress : delivery.deliveryAddress;
+    
+    if (location?.lat && location?.lng) {
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${location.lat},${location.lng}`;
+      window.open(url, '_blank');
+    } else {
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+      window.open(url, '_blank');
     }
   };
 
@@ -216,14 +193,20 @@ function Cart() {
         d.trackingId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         d.pickupAddress?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         d.deliveryAddress?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        d.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        d.senderName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        d.recipientName?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
     // Apply status filter
     if (filter !== 'all') {
       if (filter === 'active') {
-        filtered = filtered.filter(d => ['pending', 'created', 'assigned', 'picked_up', 'in_transit'].includes(d.status));
+        filtered = filtered.filter(d => ['assigned', 'picked_up', 'in_transit'].includes(d.status));
+      } else if (filter === 'pending') {
+        filtered = filtered.filter(d => d.status === 'assigned');
+      } else if (filter === 'completed') {
+        filtered = filtered.filter(d => ['delivered', 'cancelled'].includes(d.status));
       } else {
         filtered = filtered.filter(d => d.status === filter);
       }
@@ -234,17 +217,18 @@ function Cart() {
       let aVal, bVal;
       
       switch (sortBy) {
-        case 'createdAt':
-          aVal = new Date(a.createdAt);
-          bVal = new Date(b.createdAt);
+        case 'assignedAt':
+          aVal = new Date(a.assignedAt || a.createdAt);
+          bVal = new Date(b.assignedAt || b.createdAt);
           break;
         case 'price':
           aVal = parseFloat(a.estimatedPrice || a.price || 0);
           bVal = parseFloat(b.estimatedPrice || b.price || 0);
           break;
         case 'status':
-          aVal = a.status;
-          bVal = b.status;
+          const statusPriority = { 'assigned': 1, 'picked_up': 2, 'in_transit': 3, 'delivered': 4, 'cancelled': 5 };
+          aVal = statusPriority[a.status] || 0;
+          bVal = statusPriority[b.status] || 0;
           break;
         case 'deliveryDate':
           aVal = new Date(a.deliveryDate);
@@ -272,67 +256,20 @@ function Cart() {
     }));
   };
 
-  // Select deliveries for bulk actions
-  const toggleSelectDelivery = (deliveryId) => {
-    setSelectedDeliveries(prev => {
-      if (prev.includes(deliveryId)) {
-        return prev.filter(id => id !== deliveryId);
-      } else {
-        return [...prev, deliveryId];
-      }
-    });
-  };
-
-  // Bulk cancel selected deliveries
-  const handleBulkCancel = async () => {
-    if (selectedDeliveries.length === 0) {
-      alert('Please select deliveries to cancel');
-      return;
-    }
-
-    const activeDeliveries = selectedDeliveries.filter(id => {
-      const delivery = deliveries.find(d => d._id === id);
-      return delivery && !['delivered', 'cancelled'].includes(delivery.status);
-    });
-
-    if (activeDeliveries.length === 0) {
-      alert('No active deliveries selected for cancellation');
-      return;
-    }
-
-    if (!window.confirm(`Cancel ${activeDeliveries.length} selected deliveries?`)) return;
-
-    try {
-      setLoading(true);
-      
-      await Promise.all(
-        activeDeliveries.map(id =>
-          axios.patch(`http://localhost:5000/api/delivery/cancel/${id}`, {
-            cancelledBy: 'user'
-          }, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-        )
-      );
-
-      alert(`✅ ${activeDeliveries.length} deliveries cancelled successfully!`);
-      setSelectedDeliveries([]);
-      await fetchDeliveries();
-      
-    } catch (err) {
-      console.error("Error in bulk cancel:", err);
-      alert('❌ Some deliveries could not be cancelled. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  // Status progression mapping
+  const getNextStatus = (currentStatus) => {
+    const statusFlow = {
+      'assigned': 'picked_up',
+      'picked_up': 'in_transit',
+      'in_transit': 'delivered'
+    };
+    return statusFlow[currentStatus];
   };
 
   // Get status info with styling
   const getStatusInfo = (status) => {
     const statusConfig = {
-      'pending': { label: 'Pending', color: '#6c757d', icon: '⏳', bgColor: '#f8f9fa' },
-      'created': { label: 'Created', color: '#17a2b8', icon: '📋', bgColor: '#d1ecf1' },
-      'assigned': { label: 'Assigned', color: '#007bff', icon: '👤', bgColor: '#d1ecf1' },
+      'assigned': { label: 'Assigned', color: '#007bff', icon: '📋', bgColor: '#d1ecf1' },
       'picked_up': { label: 'Picked Up', color: '#28a745', icon: '📦', bgColor: '#d4edda' },
       'in_transit': { label: 'In Transit', color: '#ffc107', icon: '🚛', bgColor: '#fff3cd' },
       'delivered': { label: 'Delivered', color: '#28a745', icon: '✅', bgColor: '#d4edda' },
@@ -363,11 +300,11 @@ function Cart() {
   if (loading && deliveries.length === 0) {
     return (
       <div className="page-content">
-        <div className="cart-container">
+        <div className="agent-deliveries-container">
           <div className="loading-container">
-            <div className="loading-spinner">📦</div>
+            <div className="loading-spinner">🚛</div>
             <h3>Loading your deliveries...</h3>
-            <p>Please wait while we fetch your order history</p>
+            <p>Please wait while we fetch your assigned orders</p>
           </div>
         </div>
       </div>
@@ -378,12 +315,12 @@ function Cart() {
 
   return (
     <div className="page-content">
-      <div className="cart-container">
+      <div className="agent-deliveries-container">
         {/* Header Section */}
-        <div className="cart-header">
+        <div className="deliveries-header">
           <div className="header-info">
-            <h1>📦 My Deliveries</h1>
-            <p>Track and manage all your delivery orders</p>
+            <h1>🚛 My Deliveries</h1>
+            <p>Welcome back, <strong>{user.name || 'Agent'}</strong>! Manage your assigned deliveries</p>
           </div>
           <div className="header-actions">
             <button 
@@ -394,10 +331,10 @@ function Cart() {
               {refreshing ? '🔄' : '🔄'} Refresh
             </button>
             <button 
-              onClick={() => navigate('/addtocart')} 
-              className="new-order-btn"
+              onClick={() => navigate('/agent-dashboard')} 
+              className="dashboard-btn"
             >
-              ➕ New Order
+              📊 Dashboard
             </button>
           </div>
         </div>
@@ -417,28 +354,28 @@ function Cart() {
             <div className="stat-icon">📊</div>
             <div className="stat-info">
               <h3>{stats.total}</h3>
-              <p>Total Orders</p>
+              <p>Total Assigned</p>
             </div>
           </div>
           <div className="stat-card pending">
-            <div className="stat-icon">⏳</div>
+            <div className="stat-icon">📋</div>
             <div className="stat-info">
-              <h3>{stats.pending}</h3>
-              <p>Active Orders</p>
+              <h3>{stats.assigned}</h3>
+              <p>Pending Pickup</p>
             </div>
           </div>
-          <div className="stat-card delivered">
-            <div className="stat-icon">✅</div>
+          <div className="stat-card active">
+            <div className="stat-icon">🚛</div>
             <div className="stat-info">
-              <h3>{stats.delivered}</h3>
-              <p>Delivered</p>
+              <h3>{stats.pickedUp + stats.inTransit}</h3>
+              <p>In Progress</p>
             </div>
           </div>
-          <div className="stat-card spent">
+          <div className="stat-card earnings">
             <div className="stat-icon">💰</div>
             <div className="stat-info">
-              <h3>{formatCurrency(stats.totalSpent)}</h3>
-              <p>Total Spent</p>
+              <h3>{formatCurrency(stats.todayEarnings)}</h3>
+              <p>Today's Earnings</p>
             </div>
           </div>
         </div>
@@ -448,7 +385,7 @@ function Cart() {
           <div className="search-box">
             <input
               type="text"
-              placeholder="🔍 Search by tracking ID, address, or description..."
+              placeholder="🔍 Search by tracking ID, customer name, or address..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="search-input"
@@ -461,14 +398,13 @@ function Cart() {
               onChange={(e) => setFilter(e.target.value)}
               className="filter-select"
             >
-              <option value="all">All Status</option>
+              <option value="all">All Deliveries</option>
               <option value="active">Active Orders</option>
-              <option value="pending">Pending</option>
-              <option value="assigned">Assigned</option>
+              <option value="pending">Pending Pickup</option>
               <option value="picked_up">Picked Up</option>
               <option value="in_transit">In Transit</option>
               <option value="delivered">Delivered</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="completed">Completed</option>
             </select>
 
             <select 
@@ -476,9 +412,9 @@ function Cart() {
               onChange={(e) => setSortBy(e.target.value)}
               className="sort-select"
             >
-              <option value="createdAt">Order Date</option>
+              <option value="assignedAt">Assignment Date</option>
               <option value="deliveryDate">Delivery Date</option>
-              <option value="price">Price</option>
+              <option value="price">Earnings</option>
               <option value="status">Status</option>
             </select>
 
@@ -489,18 +425,6 @@ function Cart() {
               {sortOrder === 'asc' ? '↑' : '↓'}
             </button>
           </div>
-
-          {selectedDeliveries.length > 0 && (
-            <div className="bulk-actions">
-              <span>{selectedDeliveries.length} selected</span>
-              <button onClick={handleBulkCancel} className="bulk-cancel-btn">
-                Cancel Selected
-              </button>
-              <button onClick={() => setSelectedDeliveries([])} className="clear-selection-btn">
-                Clear
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Deliveries List */}
@@ -512,12 +436,12 @@ function Cart() {
               <p>
                 {searchQuery || filter !== 'all' 
                   ? 'Try adjusting your search or filters' 
-                  : 'You haven\'t placed any orders yet'
+                  : 'No deliveries assigned to you yet'
                 }
               </p>
               {!searchQuery && filter === 'all' && (
-                <button onClick={() => navigate('/addtocart')} className="create-order-btn">
-                  📦 Create Your First Order
+                <button onClick={() => navigate('/agent-dashboard')} className="dashboard-btn">
+                  📊 Go to Dashboard
                 </button>
               )}
             </div>
@@ -525,22 +449,20 @@ function Cart() {
             <div className="deliveries-grid">
               {filteredDeliveries.map((delivery) => {
                 const statusInfo = getStatusInfo(delivery.status);
-                const dateInfo = formatDate(delivery.createdAt);
-                const deliveryDateInfo = formatDate(delivery.deliveryDate);
+                const assignedDate = formatDate(delivery.assignedAt || delivery.createdAt);
+                const deliveryDate = formatDate(delivery.deliveryDate);
                 const isExpanded = showDetails[delivery._id];
+                const nextStatus = getNextStatus(delivery.status);
 
                 return (
                   <div key={delivery._id} className="delivery-card">
                     {/* Card Header */}
                     <div className="card-header">
                       <div className="header-left">
-                        <input
-                          type="checkbox"
-                          checked={selectedDeliveries.includes(delivery._id)}
-                          onChange={() => toggleSelectDelivery(delivery._id)}
-                          className="delivery-checkbox"
-                        />
                         <div className="delivery-id">#{delivery.trackingId}</div>
+                        <div className="customer-name">
+                          👤 {delivery.senderName || 'Customer'}
+                        </div>
                       </div>
                       <div className="header-right">
                         <div 
@@ -561,16 +483,28 @@ function Cart() {
                         <div className="route-point from">
                           <span className="route-icon">📤</span>
                           <div className="route-details">
-                            <strong>From:</strong>
+                            <strong>Pickup:</strong>
                             <p>{delivery.pickupAddress}</p>
+                            <button 
+                              onClick={() => handleDirections(delivery, 'pickup')}
+                              className="directions-btn"
+                            >
+                              🗺️ Directions
+                            </button>
                           </div>
                         </div>
                         <div className="route-arrow">→</div>
                         <div className="route-point to">
                           <span className="route-icon">📥</span>
                           <div className="route-details">
-                            <strong>To:</strong>
+                            <strong>Delivery:</strong>
                             <p>{delivery.deliveryAddress}</p>
+                            <button 
+                              onClick={() => handleDirections(delivery, 'delivery')}
+                              className="directions-btn"
+                            >
+                              🗺️ Directions
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -581,16 +515,16 @@ function Cart() {
                           <span className="value">{delivery.description}</span>
                         </div>
                         <div className="summary-item">
-                          <span className="label">💰 Amount:</span>
+                          <span className="label">💰 Earnings:</span>
                           <span className="value">{formatCurrency(delivery.estimatedPrice || delivery.price)}</span>
                         </div>
                         <div className="summary-item">
-                          <span className="label">📅 Ordered:</span>
-                          <span className="value">{dateInfo.date} at {dateInfo.time}</span>
+                          <span className="label">📅 Assigned:</span>
+                          <span className="value">{assignedDate.date} at {assignedDate.time}</span>
                         </div>
                         <div className="summary-item">
-                          <span className="label">🎯 Delivery Date:</span>
-                          <span className="value">{deliveryDateInfo.date}</span>
+                          <span className="label">🎯 Due Date:</span>
+                          <span className="value">{deliveryDate.date}</span>
                         </div>
                       </div>
 
@@ -598,22 +532,14 @@ function Cart() {
                       {isExpanded && (
                         <div className="expanded-details">
                           <div className="details-grid">
-                            {delivery.senderName && (
+                            <div className="detail-item">
+                              <span className="detail-label">📞 Sender Phone:</span>
+                              <span className="detail-value">{delivery.contactNumber}</span>
+                            </div>
+                            {delivery.recipientContact && (
                               <div className="detail-item">
-                                <span className="detail-label">👤 Sender:</span>
-                                <span className="detail-value">{delivery.senderName}</span>
-                              </div>
-                            )}
-                            {delivery.recipientName && (
-                              <div className="detail-item">
-                                <span className="detail-label">👤 Recipient:</span>
-                                <span className="detail-value">{delivery.recipientName}</span>
-                              </div>
-                            )}
-                            {delivery.contactNumber && (
-                              <div className="detail-item">
-                                <span className="detail-label">📞 Contact:</span>
-                                <span className="detail-value">{delivery.contactNumber}</span>
+                                <span className="detail-label">📞 Recipient Phone:</span>
+                                <span className="detail-value">{delivery.recipientContact}</span>
                               </div>
                             )}
                             {delivery.packageType && (
@@ -640,33 +566,25 @@ function Cart() {
                                 <span className="detail-value">{delivery.estimatedDistance} km</span>
                               </div>
                             )}
+                            {delivery.fragile && (
+                              <div className="detail-item">
+                                <span className="detail-label">⚠️ Fragile:</span>
+                                <span className="detail-value">Handle with care</span>
+                              </div>
+                            )}
+                            {delivery.requiresSignature && (
+                              <div className="detail-item">
+                                <span className="detail-label">✍️ Signature:</span>
+                                <span className="detail-value">Required</span>
+                              </div>
+                            )}
                             {delivery.specialInstructions && (
                               <div className="detail-item full-width">
-                                <span className="detail-label">📝 Instructions:</span>
+                                <span className="detail-label">📝 Special Instructions:</span>
                                 <span className="detail-value">{delivery.specialInstructions}</span>
                               </div>
                             )}
                           </div>
-
-                          {/* Status Timeline */}
-                          {delivery.statusUpdates && delivery.statusUpdates.length > 0 && (
-                            <div className="status-timeline">
-                              <h4>📊 Status Timeline</h4>
-                              <div className="timeline">
-                                {delivery.statusUpdates.map((update, index) => (
-                                  <div key={index} className="timeline-item">
-                                    <div className="timeline-dot"></div>
-                                    <div className="timeline-content">
-                                      <strong>{getStatusInfo(update.status).label}</strong>
-                                      <span className="timeline-date">
-                                        {formatDate(update.timestamp).date} at {formatDate(update.timestamp).time}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
@@ -678,39 +596,34 @@ function Cart() {
                           onClick={() => toggleDetails(delivery._id)}
                           className="details-btn"
                         >
-                          {isExpanded ? '👆 Less Details' : '👇 More Details'}
+                          {isExpanded ? '👆 Less Info' : '👇 More Info'}
                         </button>
                         
                         <button 
-                          onClick={() => handleTrack(delivery.trackingId)}
-                          className="track-btn"
+                          onClick={() => handleContact(delivery)}
+                          className="contact-btn"
                         >
-                          📍 Track
+                          📞 Contact
                         </button>
 
-                        {delivery.status === 'delivered' && (
+                        {nextStatus && (
                           <button 
-                            onClick={() => handleDownloadReceipt(delivery)}
-                            className="receipt-btn"
+                            onClick={() => updateStatus(delivery._id, nextStatus, delivery.status)}
+                            disabled={updatingStatus === delivery._id}
+                            className="update-status-btn"
                           >
-                            📄 Receipt
+                            {updatingStatus === delivery._id ? (
+                              <>🔄 Updating...</>
+                            ) : (
+                              <>✓ Mark as {nextStatus.replace('_', ' ')}</>
+                            )}
                           </button>
                         )}
 
-                        <button 
-                          onClick={() => handleRepeatOrder(delivery)}
-                          className="repeat-btn"
-                        >
-                          🔄 Repeat
-                        </button>
-
-                        {!['delivered', 'cancelled'].includes(delivery.status) && (
-                          <button 
-                            onClick={() => handleCancel(delivery)}
-                            className="cancel-btn"
-                          >
-                            ❌ Cancel
-                          </button>
+                        {delivery.status === 'delivered' && (
+                          <div className="completed-badge">
+                            ✅ Completed
+                          </div>
                         )}
                       </div>
                     </div>
@@ -725,4 +638,4 @@ function Cart() {
   );
 }
 
-export default Cart;
+export default AgentDeliveries;

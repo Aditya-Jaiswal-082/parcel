@@ -493,4 +493,40 @@
   .payment-option.selected {
     background: rgba(74, 144, 226, 0.2);
   }
+
+  /* Add to Payments.css */
+.pricing-breakdown {
+  margin: 15px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.pricing-breakdown h4 {
+  margin: 0 0 12px 0;
+  color: #495057;
+  font-size: 1rem;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.breakdown-item:last-child {
+  border-bottom: none;
+}
+
+.breakdown-item.discount {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.breakdown-item.discount span:last-child {
+  color: #28a745;
+}
+
 }

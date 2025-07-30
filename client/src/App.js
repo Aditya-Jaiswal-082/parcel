@@ -14,6 +14,7 @@ import AdminAssignDelivery from './pages/AdminAssignDelivery';
 import AdminManageUsers from './pages/AdminManageUsers';
 import Payment from './pages/payments';
 import './App.css';
+import AgentDeliveries from './pages/AgentDeliveries';
 
 function Home() {
   const [trackingId, setTrackingId] = useState('');
@@ -171,7 +172,7 @@ function Home() {
             >
               <div className="hero-content">
                 <div className="hero-text">
-                  <h1 className="hero-title">Welcome to Parcel Fast Delivery</h1>
+                  <h1 className="hero-title">Welcome to Ishika Parcel Delivery</h1>
                   <h2 className="hero-subtitle">{slide.title}</h2>
                   <p className="hero-description">{slide.subtitle}</p>
                   
@@ -406,7 +407,7 @@ function Home() {
         <div className="container">
           <div className="why-choose-content">
             <div className="why-choose-text">
-              <h2>📋 Why Choose Parcel Fast Delivery?</h2>
+              <h2>📋 Why Choose Ishika Parcel Delivery?</h2>
               <p>We're committed to providing the best delivery experience with cutting-edge technology and professional service.</p>
               
               <div className="benefits-list">
@@ -560,6 +561,9 @@ function Home() {
                 <p>✉️ support@parcelfast.com</p>
                 <p>📍 123 Delivery Street, City</p>
               </div>
+              <div>
+                ISHIKA PARCEL DELIVERY
+              </div>
             </div>
           </div>
           
@@ -600,6 +604,8 @@ function App() {
         <Route path="/AdminAssignDelivery" element={<AdminAssignDelivery />} />
         <Route path="/admin/users" element={<AdminManageUsers />} />
         <Route path="/payment" element={<Payment />} />
+        <Route path="/agent-deliveries" element={<AgentDeliveries />} />
+
       </Routes>
     </Router>
   );
