@@ -80,9 +80,11 @@ function Navbar() {
     ],
     admin: [
       { to: "/admin/users", icon: "👥", label: "Manage Users" },
-      { to: "/adminassign", icon: "📋", label: "Assign Delivery" },
+      { to: "/adminassigndelivery", icon: "📋", label: "Assign Delivery" },
       { to: "/notifications", icon: "🔔", label: "Notifications" },
       { to: "/admindashboard", icon: "⚙️", label: "Dashboard" },
+      { to: "/agentmonitor", icon: "🕵️‍♂️", label: "Agent Monitor" },
+      // { to: "/admin/agent-tasks", icon: "📊", label: "Agent Tasks" }, // new page
     ],
   };
 
@@ -107,7 +109,7 @@ function Navbar() {
               📦
             </span>
             <div className="logo-text">
-              <span className="brand-name">Parcel Fast</span>
+              <span className="brand-name">Parcel Swift</span>
               <span className="brand-tagline">Delivery</span>
             </div>
           </div>

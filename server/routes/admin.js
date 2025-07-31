@@ -278,6 +278,44 @@ router.delete('/user/:id', async (req, res) => {
   }
 });
 
+// routes/admin.js (add this at the bottom or appropriate place)
+
+router.get('/agent-tasks', async (req, res) => {
+  try {
+    const { agentId } = req.query;
+
+    // Build filter: only deliveries with assigned agent
+    const filter = { assignedAgent: { $exists: true, $ne: null } };
+    if (agentId) {
+      filter.assignedAgent = agentId;
+    }
+
+    const deliveries = await Delivery.find(filter)
+      .populate('assignedAgent', 'name email')
+      .populate('userId', 'name email')
+      .sort({ assignedAt: -1 });
+
+    const response = deliveries.map(delivery => ({
+      deliveryId: delivery._id,
+      trackingId: delivery.trackingId,
+      agent: delivery.assignedAgent,
+      user: delivery.userId,
+      pickupAddress: delivery.pickupAddress,
+      deliveryAddress: delivery.deliveryAddress,
+      status: delivery.status,
+      assignedAt: delivery.assignedAt,
+      createdAt: delivery.createdAt,
+      lastUpdated: delivery.updatedAt,
+    }));
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Error fetching agent tasks:', error);
+    res.status(500).json({ error: 'Server error loading agent tasks' });
+  }
+});
+
+
 // 🔔 GET all notifications
 router.get('/notifications', async (req, res) => {
   try {

@@ -1,0 +1,248 @@
+/* src/AdminAgentMonitor.css */
+
+/* Base colors and fonts */
+:root {
+  --page-bg: #f4f7fb;
+  --panel-bg: #fff;
+  --panel-border: #e0e7ef;
+  --accent-blue: #2563eb;
+  --accent-blue-light: #60a5fa;
+  --accent-green: #22c55e;
+  --accent-red: #ef4444;
+  --accent-yellow: #f59e0b;
+  --text-main: #1f2937;
+  --text-dim: #6b7280;
+  --radius-lg: 14px;
+  --radius-md: 9px;
+  --shadow-main: 0 6px 28px rgba(37,99,235,0.08);
+  --shadow-hover: 0 10px 34px rgba(59,130,246,0.13);
+  --font: 'Inter', system-ui, sans-serif;
+  --trans-quick: 0.18s cubic-bezier(.4,0,.2,1);
+}
+
+body {
+  background: var(--page-bg);
+  font-family: var(--font);
+  color: var(--text-main);
+  margin: 0;
+  padding: 0;
+}
+
+/* Main container */
+.agent-monitor-container {
+  background: var(--panel-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-main);
+  padding: 2.2rem 2.2rem 2.7rem;
+  margin: 2.5rem auto 3rem auto;
+  max-width: 1100px;
+  min-height: 670px;
+  border: 1.5px solid var(--panel-border);
+}
+
+.agent-monitor-container h2 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  margin: 0 0 2.1rem;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 1.2rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 2.1rem;
+}
+
+/* Select and label */
+.filter-bar label {
+  font-weight: 600;
+  color: var(--text-main);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.filter-bar select {
+  margin-left: 10px;
+  padding: 9px 18px;
+  font-size: 1rem;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--panel-border);
+  background: #f8fafc;
+  color: var(--text-main);
+  transition: border-color var(--trans-quick);
+}
+
+.filter-bar select:focus {
+  border-color: var(--accent-blue);
+  outline: none;
+}
+
+/* Refresh button */
+.refresh-button {
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-blue-light));
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0.75rem 2.2rem;
+  cursor: pointer;
+  transition: background var(--trans-quick), box-shadow var(--trans-quick);
+  box-shadow: var(--shadow-main);
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.refresh-button:hover, .refresh-button:focus-visible {
+  background: linear-gradient(95deg, #1d4fd7, #3b82f6);
+  box-shadow: var(--shadow-hover);
+  outline: none;
+}
+
+/* Loading and error/info */
+.message, .info-message {
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  margin: 2.1rem 0;
+  padding: 1.1rem 1.7rem;
+  /* user-select: none; */
+}
+
+.message {
+  background: #fee2e2;
+  color: var(--accent-red);
+  border: 1.5px solid var(--accent-red);
+}
+
+.info-message {
+  background: #ecfdf5;
+  color: var(--accent-green);
+  border: 1.5px solid var(--accent-green);
+}
+
+/* Table layout */
+.table-wrapper {
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  box-shadow: 0 4px 12px rgba(59,130,246,0.07);
+  margin-bottom: 1rem;
+}
+
+.agent-tasks-table {
+  width: 100%;
+  min-width: 950px;
+  background: #fff;
+  border-collapse: collapse;
+}
+
+.agent-tasks-table thead tr {
+  background: #f5f7fb;
+  border-bottom: 2px solid var(--accent-blue);
+}
+
+.agent-tasks-table th, .agent-tasks-table td {
+  padding: 13px 20px;
+  text-align: left;
+  font-size: 1rem;
+}
+
+.agent-tasks-table th {
+  font-weight: 700;
+  color: var(--text-dim);
+  background: #f5fafd;
+}
+
+/* Table body striping */
+.agent-tasks-table tbody tr {
+  transition: background var(--trans-quick);
+}
+.agent-tasks-table tbody tr:nth-child(even) {
+  background: #fafbff;
+}
+.agent-tasks-table tbody tr.delivered {
+  background: #d1fae5 !important;
+}
+.agent-tasks-table tbody tr.canceled {
+  background: #fee2e2 !important;
+}
+
+.agent-tasks-table tbody tr:hover {
+  background: #e3f2fd;
+}
+
+.tracking-id {
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Consolas', monospace;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.agent-cell strong,
+.user-cell strong {
+  font-weight: 700;
+  font-size: 1.02em;
+}
+.agent-cell small,
+.user-cell small {
+  color: var(--text-dim);
+  font-size: 0.92em;
+}
+
+.date-cell {
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Consolas', monospace;
+  font-size: 0.97rem;
+  color: var(--text-dim);
+}
+
+/* Badges for status */
+.status-badge {
+  border-radius: 20px;
+  padding: 5px 16px;
+  font-size: 0.99em;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  background: #EEF2FF;
+  color: #3730a3;
+  display: inline-block;
+  text-transform: capitalize;
+}
+.status-badge.assigned { background: #dbecff; color: #2865bb; }
+.status-badge.pending { background: #fff7c2; color: #b37b00; }
+.status-badge.delivered { background: #c7fad1; color: #15803d; }
+.status-badge.cancelled, .status-badge.canceled { background: #ffe2e2; color: #aa232a; }
+.status-badge.in_transit { background: #c1f2ff; color: #0369a1; }
+.status-badge.default { background: #e5e7eb; color: #6b7280; }
+
+.work-age {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--accent-blue-dark);
+  font-size: 0.92rem;
+}
+
+/* Responsive */
+@media (max-width: 1000px) {
+  .agent-monitor-container {
+    padding: 1.2rem 0.7rem 1.5rem 0.7rem;
+    border-radius: 10px;
+    min-width: 0;
+  }
+  .agent-tasks-table th, .agent-tasks-table td {
+    padding: 11px 8px;
+  }
+}
+
+@media (max-width: 700px) {
+  .table-wrapper { border-radius: 0; }
+  .agent-monitor-container { border-radius: 0; }
+  .agent-monitor-container h2 { font-size: 1.28rem; }
+}
+
+@media (max-width: 500px) {
+  .agent-monitor-container {
+    padding: 0.7rem 0.2rem 1.2rem 0.2rem;
+    min-width: 0;
+  }
+}

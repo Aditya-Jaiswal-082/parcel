@@ -15,6 +15,7 @@ import AdminManageUsers from './pages/AdminManageUsers';
 import Payment from './pages/payments';
 import './App.css';
 import AgentDeliveries from './pages/AgentDeliveries';
+import AdminAgentMonitor from './pages/AgentMonitor';
 
 function Home() {
   const [trackingId, setTrackingId] = useState('');
@@ -172,7 +173,7 @@ function Home() {
             >
               <div className="hero-content">
                 <div className="hero-text">
-                  <h1 className="hero-title">Welcome to Ishika Parcel Delivery</h1>
+                  <h1 className="hero-title">Welcome to Parcel Swift</h1>
                   <h2 className="hero-subtitle">{slide.title}</h2>
                   <p className="hero-description">{slide.subtitle}</p>
                   
@@ -407,7 +408,7 @@ function Home() {
         <div className="container">
           <div className="why-choose-content">
             <div className="why-choose-text">
-              <h2>📋 Why Choose Ishika Parcel Delivery?</h2>
+              <h2>📋 Why Choose Parce Swift?</h2>
               <p>We're committed to providing the best delivery experience with cutting-edge technology and professional service.</p>
               
               <div className="benefits-list">
@@ -529,7 +530,7 @@ function Home() {
             <div className="footer-section">
               <div className="footer-logo">
                 <span className="logo-icon">📦</span>
-                <span className="logo-text">Parcel Fast Delivery</span>
+                <span className="logo-text">Parcel Swift</span>
               </div>
               <p>Your trusted partner for fast, reliable, and secure package delivery services across the city.</p>
             </div>
@@ -558,17 +559,17 @@ function Home() {
               <h4>Contact</h4>
               <div className="contact-info">
                 <p>📞 +1 (555) 123-4567</p>
-                <p>✉️ support@parcelfast.com</p>
+                <p>✉️ adityajaiswal2704@gmail.com</p>
                 <p>📍 123 Delivery Street, City</p>
               </div>
               <div>
-                ISHIKA PARCEL DELIVERY
+                Parcel Swift
               </div>
             </div>
           </div>
           
           <div className="footer-bottom">
-            <p>&copy; 2024 Parcel Fast Delivery. All rights reserved.</p>
+            <p>&copy; 2024 Parcel Swift. All rights reserved.</p>
             <p>Made with ❤️ for better deliveries</p>
           </div>
         </div>
@@ -605,6 +606,8 @@ function App() {
         <Route path="/admin/users" element={<AdminManageUsers />} />
         <Route path="/payment" element={<Payment />} />
         <Route path="/agent-deliveries" element={<AgentDeliveries />} />
+        <Route path="/adminassigndelivery" element={<AdminAssignDelivery />} />
+        <Route path="/agentmonitor" element={<AdminAgentMonitor />} />
 
       </Routes>
     </Router>

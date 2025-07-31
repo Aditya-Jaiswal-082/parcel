@@ -11,13 +11,11 @@ function AdminAssignDelivery() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
+  // Auth headers builder with redirect on fail
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     if (!token) {
+      window.location.href = '/login';
       throw new Error('No authentication token found');
     }
     return {
@@ -26,30 +24,26 @@ function AdminAssignDelivery() {
     };
   };
 
+  // Fetch deliveries and agents
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-
       const headers = getAuthHeaders();
 
-      // Fetch both unassigned deliveries and agents
       const [deliveryRes, agentRes] = await Promise.all([
         axios.get('http://localhost:5000/api/delivery/unassigned', { headers }),
         axios.get('http://localhost:5000/api/admin/agents', { headers })
       ]);
 
-      console.log('Unassigned deliveries:', deliveryRes.data);
-      console.log('Available agents:', agentRes.data);
-
       setDeliveries(Array.isArray(deliveryRes.data) ? deliveryRes.data : []);
       setAgents(Array.isArray(agentRes.data) ? agentRes.data : []);
     } catch (err) {
-      console.error('❌ Error fetching data:', err);
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch data';
-      setError(errorMessage);
-      
-      // Redirect to login if unauthorized
+      setError(
+        err.response?.data?.error || err.message || 'Failed to fetch data'
+      );
+
+      // Redirect on 401 unauthorized
       if (err.response?.status === 401) {
         localStorage.removeItem('token');
         window.location.href = '/login';
@@ -59,74 +53,92 @@ function AdminAssignDelivery() {
     }
   };
 
-  const handleDelete = async (deliveryId) => {
-    if (!window.confirm('Are you sure you want to delete this delivery?')) return;
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line
+  }, []);
 
-    try {
-      const headers = getAuthHeaders();
-      
-      await axios.delete(`http://localhost:5000/api/delivery/admin-delete/${deliveryId}`, { headers });
-      
-      toast.success('✅ Delivery deleted and user notified');
-      fetchData(); // Refresh list
-    } catch (err) {
-      console.error('❌ Delete failed:', err.response?.data || err.message);
-      const errorMessage = err.response?.data?.error || 'Delete failed';
-      toast.error(`❌ ${errorMessage}`);
-    }
-  };
-
+  // Assign handler
   const handleAssign = async (deliveryId) => {
     const agentId = agentSelections[deliveryId];
-    if (!agentId) {
-      toast.warning('Please select an agent first');
-      return;
-    }
+    if (!agentId) return toast.warning('Please select an agent first.');
 
     try {
       const headers = getAuthHeaders();
-      
-      // ✅ FIXED: Use the correct endpoint from your backend
-      await axios.post(`http://localhost:5000/api/delivery/assign/${deliveryId}`, {
-        agentId
-      }, { headers });
-
+      await axios.post(
+        `http://localhost:5000/api/delivery/assign/${deliveryId}`,
+        { agentId },
+        { headers }
+      );
       toast.success('✅ Delivery successfully assigned!');
-      
-      // Clear the selection for this delivery
       setAgentSelections(prev => {
         const updated = { ...prev };
         delete updated[deliveryId];
         return updated;
       });
-      
-      fetchData(); // Refresh the list
+      fetchData();
     } catch (err) {
-      console.error("❌ Assignment failed:", err.response?.data || err.message);
-      const errorMessage = err.response?.data?.error || 'Assignment failed';
-      toast.error(`❌ ${errorMessage}`);
+      toast.error(
+        `❌ ${err.response?.data?.error || err.message || 'Assignment failed'}`
+      );
     }
   };
 
-  // Loading state
+  // Delete handler
+  const handleDelete = async (deliveryId) => {
+    if (!window.confirm('Are you sure you want to delete this delivery?')) return;
+
+    try {
+      const headers = getAuthHeaders();
+      await axios.delete(
+        `http://localhost:5000/api/delivery/admin-delete/${deliveryId}`,
+        { headers }
+      );
+      toast.success('✅ Delivery deleted and user notified');
+      fetchData();
+    } catch (err) {
+      toast.error(
+        `❌ ${err.response?.data?.error || 'Delete failed'}`
+      );
+    }
+  };
+
+  // === UI STATES ===
+
   if (loading) {
     return (
-      <div className="container">
+      <div className="container" style={{ paddingTop: 40 }}>
         <h2>📝 Assign Deliveries</h2>
         <p>Loading deliveries and agents...</p>
       </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
-      <div className="container">
+      <div className="container" style={{ paddingTop: 40 }}>
         <h2>📝 Assign Deliveries</h2>
-        <div style={{ color: 'red', padding: '10px', border: '1px solid red', borderRadius: '5px', marginBottom: '20px' }}>
+        <div style={{
+          color: '#fff',
+          background: '#ef4444',
+          padding: 18,
+          borderRadius: 7,
+          margin: '24px 0',
+          fontWeight: 500
+        }}>
           <strong>Error:</strong> {error}
           <br />
-          <button onClick={fetchData} style={{ marginTop: '10px' }}>
+          <button
+            onClick={fetchData}
+            style={{
+              background: '#2563eb',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 5,
+              marginTop: 14,
+              padding: '7px 18px',
+              cursor: 'pointer'
+            }}>
             🔄 Retry
           </button>
         </div>
@@ -135,34 +147,56 @@ function AdminAssignDelivery() {
   }
 
   return (
-    <div className="container">
+    <div className="container" style={{ paddingTop: 40 }}>
       <h2>📝 Assign Deliveries</h2>
 
-      <div style={{ marginBottom: '20px' }}>
-        <button onClick={fetchData} style={{ marginBottom: '10px' }}>
+      <div style={{ marginBottom: '20px', marginTop: 8 }}>
+        <button
+          onClick={fetchData}
+          style={{
+            background: '#2563eb',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 5,
+            marginBottom: 10,
+            padding: '7px 16px',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}>
           🔄 Refresh Data
         </button>
-        <p>
-          <strong>Unassigned Deliveries:</strong> {deliveries.length} | 
-          <strong> Available Agents:</strong> {agents.length}
-        </p>
+        <div style={{ marginTop: 6, color: '#4b5563' }}>
+          <strong>Unassigned Deliveries:</strong> {deliveries.length} |{' '}
+          <strong>Available Agents:</strong> {agents.length}
+        </div>
       </div>
 
       {deliveries.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#f5f5f5', borderRadius: '5px' }}>
-          <p>✅ No unassigned deliveries found.</p>
-          <p>All deliveries have been assigned to agents.</p>
+        <div style={{
+          textAlign: 'center',
+          padding: '30px',
+          backgroundColor: '#e0f7fa',
+          borderRadius: '8px'
+        }}>
+          <p style={{ color: '#22c55e', fontSize: 20, marginBottom: 6 }}>✅ All deliveries assigned!</p>
+          <p>There are no unassigned deliveries.</p>
         </div>
       ) : agents.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#fff3cd', borderRadius: '5px', border: '1px solid #ffeaa7' }}>
-          <p>⚠️ No agents available for assignment.</p>
+        <div style={{
+          textAlign: 'center',
+          padding: '30px',
+          backgroundColor: '#fdf6b2',
+          borderRadius: '8px',
+          border: '1px solid #ffeaa7'
+        }}>
+          <p style={{ color: '#d97706', fontSize: 20, marginBottom: 6 }}>⚠️ No agents available!</p>
           <p>Please create agent accounts first.</p>
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          <table border="1" cellPadding="10" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table border="0" cellPadding="10" style={{ width: '100%', borderCollapse: 'collapse', background: '#f5f7fa', borderRadius: 8 }}>
             <thead>
-              <tr style={{ backgroundColor: '#f5f5f5' }}>
+              <tr style={{ backgroundColor: '#e0e7ef', borderBottom: '2px solid #3b82f6' }}>
                 <th>Tracking ID</th>
                 <th>From</th>
                 <th>To</th>
@@ -175,21 +209,27 @@ function AdminAssignDelivery() {
             </thead>
             <tbody>
               {deliveries.map(delivery => (
-                <tr key={delivery._id}>
-                  <td style={{ fontFamily: 'monospace', backgroundColor: '#f8f9fa' }}>
-                    {delivery.trackingId || 'N/A'}
+                <tr key={delivery._id} style={{ backgroundColor: 'white', borderBottom: '1px solid #e5e7eb' }}>
+                  <td style={{
+                    fontFamily: 'monospace',
+                    fontWeight: 'bold',
+                    background: '#f0f5fa',
+                    color: '#222',
+                    fontSize: '1.05em'
+                  }}>
+                    {delivery.trackingId || '(no ID)'}
                   </td>
-                  <td style={{ maxWidth: '200px', wordWrap: 'break-word' }}>
+                  <td style={{ maxWidth: '170px', wordBreak: 'break-word' }}>
                     {delivery.pickupAddress}
                   </td>
-                  <td style={{ maxWidth: '200px', wordWrap: 'break-word' }}>
+                  <td style={{ maxWidth: '170px', wordBreak: 'break-word' }}>
                     {delivery.deliveryAddress}
                   </td>
                   <td>
                     <div>
-                      <strong>{delivery.userId?.name || 'Unknown'}</strong>
+                      <strong>{(delivery.userId && delivery.userId.name) || 'Unknown'}</strong>
                       <br />
-                      <small>{delivery.userId?.email || 'No email'}</small>
+                      <small>{(delivery.userId && delivery.userId.email) || 'No email'}</small>
                     </div>
                   </td>
                   <td>{delivery.contactNumber || 'N/A'}</td>
@@ -199,8 +239,13 @@ function AdminAssignDelivery() {
                       onChange={e =>
                         setAgentSelections({ ...agentSelections, [delivery._id]: e.target.value })
                       }
-                      style={{ width: '150px', padding: '5px' }}
-                    >
+                      style={{
+                        width: '160px',
+                        padding: '4px 6px',
+                        borderRadius: 5,
+                        outline: '1px solid #d1d5db',
+                        background: '#f3f4f6'
+                      }}>
                       <option value="">-- Select Agent --</option>
                       {agents.map(agent => (
                         <option key={agent._id} value={agent._id}>
@@ -214,14 +259,15 @@ function AdminAssignDelivery() {
                       onClick={() => handleAssign(delivery._id)}
                       disabled={!agentSelections[delivery._id]}
                       style={{
-                        backgroundColor: agentSelections[delivery._id] ? '#4caf50' : '#ccc',
-                        color: 'white',
+                        backgroundColor: agentSelections[delivery._id] ? '#22c55e' : '#94a3b8',
+                        color: '#fff',
                         border: 'none',
                         padding: '8px 12px',
-                        borderRadius: '4px',
+                        borderRadius: '5px',
+                        fontWeight: 600,
+                        fontSize: '1em',
                         cursor: agentSelections[delivery._id] ? 'pointer' : 'not-allowed'
-                      }}
-                    >
+                      }}>
                       📋 Assign
                     </button>
                   </td>
@@ -229,14 +275,15 @@ function AdminAssignDelivery() {
                     <button
                       onClick={() => handleDelete(delivery._id)}
                       style={{
-                        backgroundColor: '#f44336',
-                        color: 'white',
+                        backgroundColor: '#ef4444',
+                        color: '#fff',
                         border: 'none',
                         padding: '8px 12px',
-                        borderRadius: '4px',
+                        borderRadius: '5px',
+                        fontWeight: 600,
+                        fontSize: '1em',
                         cursor: 'pointer'
-                      }}
-                    >
+                      }}>
                       🗑️ Delete
                     </button>
                   </td>
@@ -246,10 +293,10 @@ function AdminAssignDelivery() {
           </table>
         </div>
       )}
-      
-      <ToastContainer 
-        position="top-right" 
-        autoClose={3000}
+
+      <ToastContainer
+        position="top-right"
+        autoClose={2500}
         hideProgressBar={false}
         newestOnTop={false}
         closeOnClick
