@@ -1,0 +1,125 @@
+.profile-settings {
+  max-width: 410px;
+  margin: 3.5rem auto 1.5rem;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 7px 30px rgba(37, 99, 235, 0.06);
+  padding: 2.4rem 2.2rem 2.8rem;
+}
+
+.profile-settings h2 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 2rem;
+  letter-spacing: 0.01em;
+  color: #1f2937;
+}
+
+.profile-form label {
+  display: block;
+  font-weight: 600;
+  margin: 1.25em 0 0.65em 0;
+  color: #4b5563;
+}
+
+.profile-form input {
+  width: 100%;
+  padding: 0.7em 1em;
+  font-size: 1em;
+  border-radius: 8px;
+  border: 1.7px solid #e0e7ef;
+  background: #f9fafc;
+  color: #1e293b;
+  margin-top: 0.3em;
+  transition: border-color 0.2s;
+}
+
+.profile-form input:focus {
+  border-color: #2563eb;
+  outline: none;
+  background: #fff;
+}
+
+.profile-form input[disabled] {
+  color: #888;
+  background: #f2f6fb;
+  border: 1.5px solid #e4e8ed;
+  cursor: not-allowed;
+}
+
+.profile-actions {
+  margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.primary-btn, .secondary-btn {
+  padding: 0.7em 1.8em;
+  font-size: 1.07em;
+  border-radius: 100px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.19s, color 0.19s;
+}
+
+.primary-btn {
+  background: linear-gradient(to right, #2563eb 60%, #3b82f6 100%);
+  color: #fff;
+  box-shadow: 0 6px 15px rgba(59, 130, 246, 0.09);
+}
+.primary-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.primary-btn:hover,
+.primary-btn:focus {
+  background: linear-gradient(to right, #174fc1, #2563eb);
+  color: #fff;
+}
+
+.secondary-btn {
+  background: #f5f6fa;
+  color: #265cf7;
+  border: 1.2px solid #dbeafe;
+}
+.secondary-btn:hover,
+.secondary-btn:focus {
+  background: #e6edfa;
+  color: #2462bc;
+}
+
+.profile-msg {
+  margin-top: 1.3em;
+  padding: 0.85em 1em;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 1.01em;
+}
+.profile-msg.error {
+  background: #fee2e2;
+  color: #d32f2f;
+  border: 1.4px solid #ef4444;
+}
+.profile-msg.success {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1.3px solid #22c55e;
+}
+
+.info-msg {
+  text-align: center;
+  color: #2563eb;
+  font-weight: 600;
+  font-size: 1.09em;
+}
+
+@media (max-width: 600px) {
+  .profile-settings {
+    max-width: 98vw;
+    padding: 1.3rem 0.8rem 2.0rem;
+  }
+}

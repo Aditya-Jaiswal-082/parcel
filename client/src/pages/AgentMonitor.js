@@ -1,85 +1,174 @@
-// src/AdminAgentMonitor.js
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import "./AgentMonitor.css"
+import "./AdminAgentMonitor.css";
 
+// Utility to show relative time
 function timeAgo(dateString) {
   if (!dateString) return "N/A";
   const date = new Date(dateString);
   const now = new Date();
   const diff = (now - date) / 1000;
   if (diff < 60) return "Just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
   return date.toLocaleDateString();
 }
 
-export default function AdminAgentMonitor() {
-  const [tasks, setTasks] = useState([]);
-  const [agents, setAgents] = useState([]);
-  const [selectedAgent, setSelectedAgent] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+// Your secret code setup here - change as needed
+const SECRET_CODE = "1234";
 
+export default function AdminAgentMonitor() {
+  // States
+  const [agents, setAgents] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [filteredTasks, setFilteredTasks] = useState([]);
+
+  const [filters, setFilters] = useState({
+    agentId: "",
+    status: "",
+    createdFrom: "",
+    createdTo: "",
+    assignedFrom: "",
+    assignedTo: "",
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [earnings, setEarnings] = useState([]);
+  const [earningsFilters, setEarningsFilters] = useState({
+    from: "",
+    to: ""
+  });
+  const [secretInput, setSecretInput] = useState("");
+  const [hasSecretAccess, setHasSecretAccess] = useState(false);
+
+  // Load all agents on mount
   useEffect(() => {
     fetchAgents();
   }, []);
 
+  // Fetch tasks on mount and when agent filter changes
   useEffect(() => {
     fetchTasks();
-    // eslint-disable-next-line
-  }, [selectedAgent]);
+  }, [filters.agentId]);
 
-  // Fetch all agents independently for dropdown
+  // Filter tasks on filters or when received new data
+  useEffect(() => {
+    applyFilters();
+  }, [tasks, filters]);
+
+  // Fetch aggregated earnings data when secret access granted or filters change
+  useEffect(() => {
+    if (hasSecretAccess) {
+      fetchEarnings();
+    }
+  }, [earningsFilters, hasSecretAccess]);
+
   async function fetchAgents() {
     try {
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("No authentication token found.");
-      const headers = { Authorization: `Bearer ${token}` };
-      const res = await axios.get("http://localhost:5000/api/admin/agents", { headers });
-      setAgents(Array.isArray(res.data) ? res.data : []);
+      if (!token) throw new Error("No auth token, please login");
+      const { data } = await axios.get("http://localhost:5000/api/admin/agents", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAgents(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || "Failed to load agents.");
-      setAgents([]);
+      setError("Failed to load agents.");
     }
   }
 
-  // Fetch tasks filtered by selectedAgent or all if none selected
   async function fetchTasks() {
     setLoading(true);
     setError("");
     try {
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("No authentication token. Please login again.");
-      const headers = { Authorization: `Bearer ${token}` };
-      const url = selectedAgent
-        ? `http://localhost:5000/api/admin/agent-tasks?agentId=${selectedAgent}`
-        : `http://localhost:5000/api/admin/agent-tasks`;
-
-      const res = await axios.get(url, { headers });
-      setTasks(Array.isArray(res.data) ? res.data : []);
+      if (!token) throw new Error("No auth token, please login");
+      let url = "http://localhost:5000/api/admin/agent-tasks";
+      if (filters.agentId) {
+        url += `?agentId=${filters.agentId}`;
+      }
+      const { data } = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTasks(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || "Failed to load tasks.");
+      setError("Failed to load tasks.");
       setTasks([]);
     } finally {
       setLoading(false);
     }
   }
 
-  return (
-    <div className="notifications-container" style={{ minHeight: 600, marginTop: 40 }}>
-      <h2 style={{ fontWeight: 800, fontSize: 32, marginBottom: 30 }}>
-        🕵️‍♂️ Agent Work Monitor
-      </h2>
+  function applyFilters() {
+    let filtered = [...tasks];
 
-      <div style={{ marginBottom: 16, display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ fontWeight: 600 }}>Filter by Agent:</span>
+    if (filters.status) {
+      filtered = filtered.filter(
+        t => (t.status?.toLowerCase() || "") === filters.status.toLowerCase()
+      );
+    }
+    if (filters.createdFrom) {
+      const fromDate = new Date(filters.createdFrom);
+      filtered = filtered.filter(t => new Date(t.createdAt) >= fromDate);
+    }
+    if (filters.createdTo) {
+      const toDate = new Date(filters.createdTo);
+      filtered = filtered.filter(t => new Date(t.createdAt) <= toDate);
+    }
+    if (filters.assignedFrom) {
+      const fromDate = new Date(filters.assignedFrom);
+      filtered = filtered.filter(t => new Date(t.assignedAt) >= fromDate);
+    }
+    if (filters.assignedTo) {
+      const toDate = new Date(filters.assignedTo);
+      filtered = filtered.filter(t => new Date(t.assignedAt) <= toDate);
+    }
+
+    setFilteredTasks(filtered);
+  }
+
+  // Fetch earnings aggregated by agent
+  async function fetchEarnings() {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No auth token, please login");
+      let url = "http://localhost:5000/api/admin/agent-earnings";
+      const params = [];
+      if (earningsFilters.from) params.push(`from=${earningsFilters.from}`);
+      if (earningsFilters.to) params.push(`to=${earningsFilters.to}`);
+      if (params.length) url += `?${params.join("&")}`;
+
+      const { data } = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setEarnings(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // silently fail or show message
+    }
+  }
+
+  function handleSecretInputChange(e) {
+    const val = e.target.value;
+    setSecretInput(val);
+    if (val === SECRET_CODE) {
+      setHasSecretAccess(true);
+    } else {
+      setHasSecretAccess(false);
+    }
+  }
+
+  return (
+    <div className="agent-monitor-container">
+      <h2 tabIndex="0">🕵️‍♂️ Agent Work Monitor</h2>
+      
+      <div className="filter-bar" role="region" aria-label="Task filters">
+        <label>
+          Agent:
           <select
-            value={selectedAgent}
-            onChange={e => setSelectedAgent(e.target.value)}
-            style={{ padding: "7px 12px", borderRadius: 6, minWidth: 180 }}
+            aria-label="Filter by Agent"
+            value={filters.agentId}
+            onChange={e => setFilters(f => ({ ...f, agentId: e.target.value }))}
           >
             <option value="">All Agents</option>
             {agents.map(agent => (
@@ -90,103 +179,150 @@ export default function AdminAgentMonitor() {
           </select>
         </label>
 
+        <label>
+          Status:
+          <select
+            aria-label="Filter by Status"
+            value={filters.status}
+            onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}
+          >
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="assigned">Assigned</option>
+            <option value="picked_up">Picked Up</option>
+            <option value="in_transit">In Transit</option>
+            <option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </label>
+
+        <label>
+          Created From:
+          <input
+            type="date"
+            aria-label="Created From Date"
+            value={filters.createdFrom}
+            onChange={e => setFilters(f => ({ ...f, createdFrom: e.target.value }))}
+          />
+        </label>
+
+        <label>
+          Created To:
+          <input
+            type="date"
+            aria-label="Created To Date"
+            value={filters.createdTo}
+            onChange={e => setFilters(f => ({ ...f, createdTo: e.target.value }))}
+          />
+        </label>
+
+        <label>
+          Assigned From:
+          <input
+            type="date"
+            aria-label="Assigned From Date"
+            value={filters.assignedFrom}
+            onChange={e => setFilters(f => ({ ...f, assignedFrom: e.target.value }))}
+          />
+        </label>
+
+        <label>
+          Assigned To:
+          <input
+            type="date"
+            aria-label="Assigned To Date"
+            value={filters.assignedTo}
+            onChange={e => setFilters(f => ({ ...f, assignedTo: e.target.value }))}
+          />
+        </label>
+
         <button
-          onClick={fetchTasks}
-          style={{
-            background: "#2563eb",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            padding: "8px 22px",
-            fontWeight: "600",
-            cursor: "pointer",
-            whiteSpace: "nowrap"
-          }}
+          className="refresh-button"
+          onClick={() => fetchTasks()}
+          aria-label="Refresh data"
         >
           🔄 Refresh
         </button>
       </div>
 
+      <div className="secret-access-container" style={{ marginBottom: "1.5rem" }}>
+        <label htmlFor="secretCodeInput">Enter Secret Code to Reveal Totals:</label>
+        <input
+          id="secretCodeInput"
+          type="password"
+          value={secretInput}
+          onChange={handleSecretInputChange}
+          placeholder="Secret Code"
+          className="secret-code-input"
+          aria-label="Secret code input"
+        />
+      </div>
+
+      {hasSecretAccess && (
+        <div className="earnings-summary" aria-live="polite" aria-atomic="true">
+          <h3>Earnings Summary</h3>
+          <p>Total Deliveries Completed Today: {earnings.reduce((sum, a) => sum + (a.date === new Date().toDateString() ? a.totalEarnings : 0), 0).toFixed(2)}</p>
+          <p>Total Deliveries Completed This Month: {earnings.reduce((sum, a) => {
+            const month = new Date(a.date).getMonth();
+            const now = new Date().getMonth();
+            return month === now ? sum + a.totalEarnings : sum;
+          }, 0).toFixed(2)}</p>
+        </div>
+      )}
+
+      {error && <div className="message" role="alert">{error}</div>}
+
       {loading ? (
-        <p>Loading agent tasks...</p>
-      ) : error ? (
-        <div style={{ color: "#ef4444", margin: "16px 0" }}>
-          <strong>Error:</strong> {error}
-        </div>
-      ) : tasks.length === 0 ? (
-        <div style={{ color: "#22c55e", padding: 40 }}>
-          <b>No assigned deliveries found for selected agent.</b>
-        </div>
+        <p>Loading...</p>
+      ) : filteredTasks.length === 0 ? (
+        <p className="info-message">No tasks found matching filters.</p>
       ) : (
-        <div style={{ overflowX: "auto", borderRadius: 8 }}>
-          <table
-            cellPadding={9}
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "1rem",
-              background: "#f5f7fb",
-              borderRadius: 8,
-              marginBottom: 20
-            }}
-          >
+        <div className="table-wrapper">
+          <table className="agent-tasks-table" aria-label="Assigned deliveries table">
             <thead>
-              <tr style={{ background: "#e0e7ef", userSelect: "none" }}>
-                <th style={{ minWidth: 100 }}>Agent</th>
-                <th style={{ minWidth: 120 }}>Tracking ID</th>
-                <th style={{ minWidth: 110 }}>Status</th>
-                <th style={{ minWidth: 150 }}>Assigned</th>
-                <th style={{ minWidth: 100 }}>Work Age</th>
-                <th style={{ minWidth: 150 }}>Created</th>
-                <th style={{ minWidth: 150 }}>Last Update</th>
-                <th style={{ minWidth: 130 }}>User</th>
-                <th style={{ minWidth: 200 }}>Pickup</th>
-                <th style={{ minWidth: 200 }}>Delivery</th>
+              <tr>
+                <th>Agent</th>
+                <th>Tracking ID</th>
+                <th>Status</th>
+                <th>Assigned At</th>
+                <th>Work Age</th>
+                <th>Created At</th>
+                <th>Last Update</th>
+                <th>User</th>
+                <th>Pickup Address</th>
+                <th>Delivery Address</th>
               </tr>
             </thead>
+
             <tbody>
-              {tasks.map((d, i) => (
-                <tr
-                  key={d.deliveryId || i}
-                  style={{
-                    borderBottom: "1px solid #e5e7eb",
-                    background:
-                      d.status?.toLowerCase() === "delivered"
-                        ? "#ecfdf5"
-                        : d.status?.toLowerCase() === "cancelled"
-                        ? "#fef2f2"
-                        : i % 2
-                        ? "#fff"
-                        : "#f6f9ff",
-                    userSelect: "text",
-                  }}
-                >
-                  <td style={{ fontWeight: 600 }}>
-                    {d.agent?.name || "—"}
-                    <br />
-                    <span style={{ fontSize: "0.9em", color: "#555" }}>{d.agent?.email || ""}</span>
+              {filteredTasks.map((task, idx) => (
+                <tr key={task.deliveryId || idx} tabIndex={0}>
+                  <td className="agent-cell">
+                    <strong>{task.agent?.name || "N/A"}</strong>
+                    <small>{task.agent?.email || ""}</small>
                   </td>
-                  <td style={{ fontFamily: "monospace" }}>{d.trackingId || "-"}</td>
-                  <td>{d.status || "-"}</td>
-                  <td>{d.assignedAt ? new Date(d.assignedAt).toLocaleString() : "-"}</td>
-                  <td>{d.assignedAt ? timeAgo(d.assignedAt) : "-"}</td>
-                  <td>{d.createdAt ? new Date(d.createdAt).toLocaleString() : "-"}</td>
-                  <td>{d.lastUpdated ? new Date(d.lastUpdated).toLocaleString() : "-"}</td>
+                  <td className="tracking-id">{task.trackingId || "N/A"}</td>
                   <td>
-                    <span>
-                      {d.user?.name || "-"}
-                      <br />
-                      <span style={{ fontSize: "0.9em", color: "#777" }}>{d.user?.email || ""}</span>
+                    <span className={`status-badge ${task.status?.toLowerCase() || "default"}`}>
+                      {task.status || "Unknown"}
                     </span>
                   </td>
-                  <td style={{ maxWidth: 195, whiteSpace: "normal" }}>{d.pickupAddress || "-"}</td>
-                  <td style={{ maxWidth: 195, whiteSpace: "normal" }}>{d.deliveryAddress || "-"}</td>
+                  <td className="date-cell">{task.assignedAt ? new Date(task.assignedAt).toLocaleString() : "N/A"}</td>
+                  <td className="work-age">{task.assignedAt ? timeAgo(task.assignedAt) : "N/A"}</td>
+                  <td className="date-cell">{task.createdAt ? new Date(task.createdAt).toLocaleString() : "N/A"}</td>
+                  <td className="date-cell">{task.lastUpdated ? new Date(task.lastUpdated).toLocaleString() : "N/A"}</td>
+                  <td className="user-cell">
+                    <strong>{task.user?.name || "N/A"}</strong>
+                    <small>{task.user?.email || ""}</small>
+                  </td>
+                  <td title={task.pickupAddress} className="pickup-cell">{task.pickupAddress || "N/A"}</td>
+                  <td title={task.deliveryAddress} className="delivery-cell">{task.deliveryAddress || "N/A"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div style={{ textAlign: "right", color: "#4b5563", fontSize: 17, marginTop: 10 }}>
-            Showing <b>{tasks.length}</b> assignment{tasks.length !== 1 ? "s" : ""}
+          <div className="task-count" aria-live="polite">
+            Showing {filteredTasks.length} assignments
           </div>
         </div>
       )}

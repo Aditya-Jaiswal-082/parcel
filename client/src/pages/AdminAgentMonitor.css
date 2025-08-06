@@ -222,6 +222,77 @@ body {
   font-size: 0.92rem;
 }
 
+.earnings-section {
+  margin-top: 2.5rem;
+  background: var(--color-bg-panel);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--box-shadow-light);
+  padding: 1.5rem 2rem;
+}
+
+.earnings-section h3 {
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.earnings-filters {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.earnings-filters label {
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+}
+
+.earnings-filters input[type="date"] {
+  padding: 6px 12px;
+  border-radius: var(--border-radius-md);
+  border: 1.8px solid var(--color-bg-panel);
+  font-size: 1rem;
+}
+
+.earnings-filters button {
+  background: var(--color-primary);
+  color: white;
+  font-weight: 700;
+  border: none;
+  border-radius: 32px;
+  padding: 8px 22px;
+  cursor: pointer;
+  box-shadow: var(--box-shadow-light);
+  transition: background-color 0.3s ease;
+}
+
+.earnings-filters button:hover {
+  background: var(--color-primary-dark);
+}
+
+.earnings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+}
+
+.earnings-table thead {
+  background: var(--color-bg-panel);
+  color: var(--color-text-secondary);
+}
+
+.earnings-table th, .earnings-table td {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-bg-panel);
+  text-align: left;
+}
+
+.earnings-table tbody tr:hover {
+  background: #e3f2fd;
+}
+
+
 /* Responsive */
 @media (max-width: 1000px) {
   .agent-monitor-container {

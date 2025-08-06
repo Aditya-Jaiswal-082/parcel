@@ -331,6 +331,65 @@ router.get('/notifications', async (req, res) => {
   }
 });
 
+
+// routes/admin.js (add below existing routes)
+
+router.get('/agent-earnings', async (req, res) => {
+  try {
+    const { from, to } = req.query; // ISO date strings, optional filter
+
+    // Build filter for date range on assignedAt or createdAt or deliveredAt
+    const dateFilter = {};
+    if (from) dateFilter.$gte = new Date(from);
+    if (to) dateFilter.$lte = new Date(to);
+
+    const matchFilter = {
+      assignedAgent: { $exists: true, $ne: null },
+      status: 'delivered', // or only completed deliveries count as earnings
+    };
+    if (from || to) {
+      matchFilter.assignedAt = dateFilter;
+    }
+
+    const aggregation = await Delivery.aggregate([
+      { $match: matchFilter },
+      {
+        $group: {
+          _id: "$assignedAgent",
+          totalEarnings: { $sum: "$amount" }, // your earning field
+          deliveriesCount: { $sum: 1 },
+        }
+      },
+      {
+        $lookup: {
+          from: "users",      // collection name for users
+          localField: "_id",
+          foreignField: "_id",
+          as: "agent"
+        }
+      },
+      { $unwind: "$agent" },
+      {
+        $project: {
+          _id: 0,
+          agentId: "$agent._id",
+          agentName: "$agent.name",
+          agentEmail: "$agent.email",
+          totalEarnings: 1,
+          deliveriesCount: 1
+        }
+      },
+      { $sort: { totalEarnings: -1 } }
+    ]);
+
+    res.status(200).json(aggregation);
+  } catch (err) {
+    console.error('❌ Error in /agent-earnings:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
 // 📢 Send broadcast notification
 router.post('/broadcast', async (req, res) => {
   const { message, userType } = req.body;
