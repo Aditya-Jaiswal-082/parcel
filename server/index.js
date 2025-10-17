@@ -21,7 +21,7 @@ mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 }).then(() => {
-  console.log('✅ Connected to MongoDB');
+  console.log('✅ Connected to MongoDB ATLAS');
   app.listen(PORT, () => {
     console.log(`🌐 Server running on port ${PORT}`);
   });

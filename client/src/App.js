@@ -16,6 +16,8 @@ import Payment from './pages/payments';
 import './App.css';
 import AgentDeliveries from './pages/AgentDeliveries';
 import AdminAgentMonitor from './pages/AgentMonitor';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 function Home() {
   const [trackingId, setTrackingId] = useState('');
@@ -408,7 +410,7 @@ function Home() {
         <div className="container">
           <div className="why-choose-content">
             <div className="why-choose-text">
-              <h2>📋 Why Choose Parce Swift?</h2>
+              <h2>📋 Why Choose Parcel Swift?</h2>
               <p>We're committed to providing the best delivery experience with cutting-edge technology and professional service.</p>
               
               <div className="benefits-list">
@@ -558,9 +560,9 @@ function Home() {
             <div className="footer-section">
               <h4>Contact</h4>
               <div className="contact-info">
-                <p>📞 +1 (555) 123-4567</p>
+                <p>📞 9722404430</p>
                 <p>✉️ adityajaiswal2704@gmail.com</p>
-                <p>📍 123 Delivery Street, City</p>
+                <p>📍 ParulUniversity</p>
               </div>
               <div>
                 Parcel Swift
@@ -608,6 +610,8 @@ function App() {
         <Route path="/agent-deliveries" element={<AgentDeliveries />} />
         <Route path="/adminassigndelivery" element={<AdminAssignDelivery />} />
         <Route path="/agentmonitor" element={<AdminAgentMonitor />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
 
       </Routes>
     </Router>
