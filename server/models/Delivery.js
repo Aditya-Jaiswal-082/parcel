@@ -1,15 +1,16 @@
-// models/Delivery.js - Enhanced version
+// models/Delivery.js
 const mongoose = require('mongoose');
 
+// Schema for status updates
 const StatusUpdateSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: [
-      'pending',        // Added for new orders
+      'pending',       // New orders
       'created',
       'assigned',
-      'picked_up',      // Changed from 'onpickup' to match routes
-      'in_transit',     // Changed from 'in progress' to match routes
+      'picked_up',     // Changed from 'onpickup'
+      'in_transit',    // Changed from 'in progress'
       'delivered',
       'cancelled'
     ]
@@ -18,7 +19,7 @@ const StatusUpdateSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  updatedBy: {       // Added to track who updated the status
+  updatedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     default: null
@@ -34,13 +35,14 @@ const StatusUpdateSchema = new mongoose.Schema({
   }
 });
 
+// Main Delivery schema
 const DeliverySchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  
+
   // Address fields
   pickupAddress: { type: String, required: true },
   deliveryAddress: { type: String, required: true },
@@ -52,37 +54,37 @@ const DeliverySchema = new mongoose.Schema({
     lat: Number,
     lng: Number
   },
-  
+
   // Basic delivery info
   description: { type: String, required: true },
   contactNumber: { type: String, required: true },
   deliveryDate: Date,
-  
+
   // Pricing fields
   price: Number,
-  estimatedPrice: Number,    // Added for enhanced pricing
-  estimatedDistance: Number, // Added for distance tracking
-  
+  estimatedPrice: Number,
+  estimatedDistance: Number,
+
   // Tracking
   trackingId: {
     type: String,
     required: true,
-    unique: true
+    unique: true // ✅ This already creates an index — no need to add it below
   },
 
-  // Status with updated enum values
+  // Status
   status: {
     type: String,
     enum: [
-      'pending',        // For newly created orders
-      'created',        // Keep for backward compatibility
+      'pending',
+      'created',
       'assigned',
-      'picked_up',      // Changed from 'onpickup'
-      'in_transit',     // Changed from 'in progress'
+      'picked_up',
+      'in_transit',
       'delivered',
       'cancelled'
     ],
-    default: 'pending'  // Changed default to 'pending'
+    default: 'pending'
   },
 
   statusUpdates: [StatusUpdateSchema],
@@ -93,7 +95,7 @@ const DeliverySchema = new mongoose.Schema({
     default: null
   },
 
-  // Enhanced fields from AddToCart
+  // Enhanced fields
   senderName: String,
   recipientName: String,
   recipientContact: String,
@@ -162,28 +164,27 @@ const DeliverySchema = new mongoose.Schema({
   },
 
   // Timestamps
-  assignedAt: Date,        // When agent was assigned
+  assignedAt: Date,
   createdAt: {
     type: Date,
     default: Date.now
   },
-  updatedAt: {            // Added for tracking updates
+  updatedAt: {
     type: Date,
     default: Date.now
   }
 });
 
-// Update the updatedAt field before saving
-DeliverySchema.pre('save', function(next) {
+// Middleware to auto-update updatedAt before saving
+DeliverySchema.pre('save', function (next) {
   this.updatedAt = new Date();
   next();
 });
 
-// Index for better performance
+// ✅ Useful indexes (trackingId removed to avoid duplicate)
 DeliverySchema.index({ userId: 1 });
 DeliverySchema.index({ assignedAgent: 1 });
 DeliverySchema.index({ status: 1 });
-DeliverySchema.index({ trackingId: 1 });
 DeliverySchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('Delivery', DeliverySchema);
