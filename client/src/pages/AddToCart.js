@@ -963,7 +963,7 @@ function AddToCart() {
                     <label>Delivery Urgency</label>
                     <select name="urgency" value={formData.urgency} onChange={handleChange}>
                       <option value="standard">📦 Standard</option>
-                      <option value="express">⚡ Express (50% extra)</option>
+                      <option value="express">⚡ Express (20% extra)</option>
                     </select>
                   </div>
                 </div>
@@ -1029,7 +1029,7 @@ function AddToCart() {
                     />
                     <span className="checkmark">⚠️</span>
                     <div className="checkbox-content">
-                      <strong>Fragile Package (+₹25)</strong>
+                      <strong>Fragile Package (+₹15)</strong>
                       <small>Extra care handling for delicate items</small>
                     </div>
                   </label>
@@ -1043,7 +1043,7 @@ function AddToCart() {
                     />
                     <span className="checkmark">✍️</span>
                     <div className="checkbox-content">
-                      <strong>Requires Signature (+₹15)</strong>
+                      <strong>Requires Signature (+₹5)</strong>
                       <small>Recipient must sign upon delivery</small>
                     </div>
                   </label>
