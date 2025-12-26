@@ -3,8 +3,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './AgentDeliveries.css';
+import api from "../api/api";
 function AgentDeliveries() {
   const navigate = useNavigate();
+  
   
   // State management
   const [deliveries, setDeliveries] = useState([]);
@@ -60,7 +62,7 @@ function AgentDeliveries() {
       
       setError(null);
 
-      const res = await axios.get(`http://localhost:5000/api/delivery/assigned/${agentId}`, {
+      const res = await api.get(`api/delivery/assigned/${agentId}`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -129,8 +131,8 @@ function AgentDeliveries() {
     setError(null);
 
     try {
-      const response = await axios.patch(
-        `http://localhost:5000/api/delivery/update-status/${deliveryId}`, 
+      const response = await api.patch(
+        `api/delivery/update-status/${deliveryId}`, 
         { 
           newStatus,
           agentId,

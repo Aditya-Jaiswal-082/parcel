@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import api from "./api/api";
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Navbar from './pages/Navbar';
@@ -89,7 +90,7 @@ function Home() {
     setTrackingData(null);
 
     try {
-      const response = await axios.get(`http://localhost:5000/api/delivery/track/${trackingId.trim()}`);
+      const response = await api.get(`api/delivery/track/${trackingId.trim()}`);
       setTrackingData(response.data);
       setShowTrackingResult(true);
     } catch (error) {

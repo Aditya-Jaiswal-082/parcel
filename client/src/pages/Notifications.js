@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import "./Notifications.css";
+import api from "../api/api";
 
 function Notifications() {
   const [notifications, setNotifications] = useState([]);
@@ -254,7 +255,7 @@ function Notifications() {
 
     try {
       for (const id of selectedIds) {
-        await axios.delete(`http://localhost:5000/api/notifications/${id}`, {
+        await api.delete(`api/notifications/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
       }
@@ -278,8 +279,8 @@ function Notifications() {
     }
     try {
       for (const id of selectedIds) {
-        await axios.patch(
-          `http://localhost:5000/api/notifications/${id}/read`,
+        await api.patch(
+          `api/notifications/${id}/read`,
           {},
           {
             headers: { Authorization: `Bearer ${token}` },
@@ -304,8 +305,8 @@ function Notifications() {
   async function markAsRead(id, index) {
     if (notifications[index].read) return;
     try {
-      await axios.patch(
-        `http://localhost:5000/api/notifications/${id}/read`,
+      await api.patch(
+        `api/notifications/${id}/read`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -322,7 +323,7 @@ function Notifications() {
   async function deleteSingle(id) {
     if (!window.confirm("Delete this notification?")) return;
     try {
-      await axios.delete(`http://localhost:5000/api/notifications/${id}`, {
+      await api.delete(`api/notifications/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const remaining = notifications.filter((n) => n._id !== id);

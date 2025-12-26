@@ -1,6 +1,7 @@
 // src/pages/AdminManageUsers.js
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import api from "../api/api";
 
 function AdminManageUsers() {
   const [users, setUsers] = useState([]);
@@ -20,7 +21,7 @@ function AdminManageUsers() {
         throw new Error('No authentication token found');
       }
 
-      const res = await axios.get('http://localhost:5000/api/admin/users', {
+      const res = await api.get('api/admin/users', {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -63,7 +64,7 @@ function AdminManageUsers() {
         return;
       }
 
-      await axios.patch(`http://localhost:5000/api/admin/user/${id}`, form, {
+      await api.patch(`api/admin/user/${id}`, form, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -89,7 +90,7 @@ function AdminManageUsers() {
         return;
       }
 
-      await axios.delete(`http://localhost:5000/api/admin/user/${id}`, {
+      await api.delete(`api/admin/user/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'

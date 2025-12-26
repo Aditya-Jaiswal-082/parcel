@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom'; // <-- import Link here
 import axios from 'axios';
 import './parcel.css';
+import api from "../api/api";
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -13,7 +14,8 @@ function Login() {
     e.preventDefault();
 
     try {
-      const res = await axios.post('https://parcel-swift.onrender.com/api/auth/login', {
+    // const res = await axios.post('`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login', {
+      const res = await api.post("api/auth/login", {
         email,
         password
       });

@@ -1,6 +1,7 @@
 // File: src/AdminDashboard.js
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import api from "../api/api";
 
 function AdminDashboard() {
   const [deliveries, setDeliveries] = useState([]);
@@ -38,7 +39,7 @@ function AdminDashboard() {
       const headers = getAuthHeaders();
 
       // ✅ FIXED: Added authentication headers
-      const res = await axios.get('http://localhost:5000/api/delivery/all', { headers });
+      const res = await api.get('api/delivery/all', { headers });
       
       console.log('Fetched deliveries:', res.data);
       const deliveriesData = Array.isArray(res.data) ? res.data : [];

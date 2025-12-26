@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './AgentDashboard.css';
+import api from "../api/api";
 
 function AgentDashboard() {
   const navigate = useNavigate();
@@ -72,7 +73,7 @@ function AgentDashboard() {
   // Fetch unassigned deliveries
   const fetchUnassignedDeliveries = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/delivery/unassigned', {
+      const res = await api.get('api/delivery/unassigned', {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -116,7 +117,7 @@ function AgentDashboard() {
   // Fetch assigned deliveries
   const fetchAssignedDeliveries = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/delivery/assigned/${agentId}`, {
+      const res = await api.get(`api/delivery/assigned/${agentId}`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -160,7 +161,7 @@ function AgentDashboard() {
   // Fetch agent statistics
   const fetchAgentStats = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/delivery/agent/stats/${agentId}`, {
+      const res = await api.get(`api/delivery/agent/stats/${agentId}`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -198,8 +199,8 @@ function AgentDashboard() {
     setError(null);
 
     try {
-      const response = await axios.patch(
-        `http://localhost:5000/api/delivery/claim/${deliveryId}`, 
+      const response = await api.patch(
+        `api/delivery/claim/${deliveryId}`, 
         { agentId },
         {
           headers: { 
@@ -266,8 +267,8 @@ function AgentDashboard() {
     setError(null);
 
     try {
-      const response = await axios.patch(
-        `http://localhost:5000/api/delivery/update-status/${deliveryId}`, 
+      const response = await api.patch(
+        `api/delivery/update-status/${deliveryId}`, 
         { 
           newStatus,
           agentId,
@@ -321,7 +322,7 @@ function AgentDashboard() {
   // Create notification helper
   const createNotification = async (message) => {
     try {
-      await axios.post('http://localhost:5000/api/notifications/create', {
+      await api.post('api/notifications/create', {
         userId: agentId,
         message,
         type: 'agent_activity',

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./AdminAgentMonitor.css";
+import api from "../api/api";
 
 // Utility to show relative time
 function timeAgo(dateString) {
@@ -69,7 +70,7 @@ export default function AdminAgentMonitor() {
     try {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No auth token, please login");
-      const { data } = await axios.get("http://localhost:5000/api/admin/agents", {
+      const { data } = await api.get("api/admin/agents", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setAgents(Array.isArray(data) ? data : []);
@@ -84,20 +85,25 @@ export default function AdminAgentMonitor() {
     try {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No auth token, please login");
-      let url = "http://localhost:5000/api/admin/agent-tasks";
-      if (filters.agentId) {
-        url += `?agentId=${filters.agentId}`;
-      }
-      const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
+
+      const { data } = await api.get("/api/admin/agent-tasks", {
+        params: {
+          agentId: filters.agentId || undefined,
+        },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
+
       setTasks(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError("Failed to load tasks.");
-      setTasks([]);
-    } finally {
-      setLoading(false);
-    }
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load tasks.");
+        setTasks([]);
+      } finally {
+        setLoading(false);
+      }
+
   }
 
   function applyFilters() {
@@ -133,19 +139,23 @@ export default function AdminAgentMonitor() {
     try {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No auth token, please login");
-      let url = "http://localhost:5000/api/admin/agent-earnings";
-      const params = [];
-      if (earningsFilters.from) params.push(`from=${earningsFilters.from}`);
-      if (earningsFilters.to) params.push(`to=${earningsFilters.to}`);
-      if (params.length) url += `?${params.join("&")}`;
 
-      const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
+      const { data } = await api.get("/api/admin/agent-earnings", {
+        params: {
+          from: earningsFilters.from || undefined,
+          to: earningsFilters.to || undefined,
+        },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
-      setEarnings(Array.isArray(data) ? data : []);
-    } catch (err) {
-      // silently fail or show message
-    }
+
+          setEarnings(Array.isArray(data) ? data : []);
+        } catch (err) {
+          console.error(err);
+          // optionally set an error message here
+        }
+
   }
 
   function handleSecretInputChange(e) {

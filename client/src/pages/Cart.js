@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import './Cart.css';
-
+import api from "../api/api";
 function Cart() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -67,7 +67,7 @@ function Cart() {
       
       setError(null);
 
-      const res = await axios.get(`http://localhost:5000/api/delivery/user/${userId}`, {
+      const res = await api.get(`api/delivery/user/${userId}`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -127,7 +127,7 @@ function Cart() {
     try {
       setLoading(true);
       
-      await axios.patch(`http://localhost:5000/api/delivery/cancel/${delivery._id}`, {
+      await api.patch(`api/delivery/cancel/${delivery._id}`, {
         cancelledBy: 'user'
       }, {
         headers: { 
@@ -187,7 +187,7 @@ function Cart() {
   // Download invoice/receipt
   const handleDownloadReceipt = async (delivery) => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/delivery/receipt/${delivery._id}`, {
+      const response = await api.get(`api/delivery/receipt/${delivery._id}`, {
         headers: { 'Authorization': `Bearer ${token}` },
         responseType: 'blob'
       });
@@ -307,7 +307,7 @@ function Cart() {
       
       await Promise.all(
         activeDeliveries.map(id =>
-          axios.patch(`http://localhost:5000/api/delivery/cancel/${id}`, {
+          api.patch(`api/delivery/cancel/${id}`, {
             cancelledBy: 'user'
           }, {
             headers: { 'Authorization': `Bearer ${token}` }

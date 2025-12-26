@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./ProfileSettings.css";
+import api from "../api/api"
 
 export default function ProfileSettings() {
   const [profile, setProfile] = useState({ name: "", email: "" });
@@ -20,8 +21,8 @@ export default function ProfileSettings() {
     try {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("Unauthorized");
-      const { data } = await axios.get(
-        "http://localhost:5000/api/user/me",
+      const { data } = await api.get(
+        "api/user/me",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setProfile({ name: data.name, email: data.email });
@@ -39,8 +40,8 @@ export default function ProfileSettings() {
     try {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("Unauthorized");
-      await axios.patch(
-        "http://localhost:5000/api/user/me",
+      await api.patch(
+        "api/user/me",
         { 
           name: profile.name, 
           email: profile.email, 

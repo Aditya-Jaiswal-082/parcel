@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import api from "../api/api";
 
 function AdminAssignDelivery() {
   const [deliveries, setDeliveries] = useState([]);
@@ -32,8 +33,8 @@ function AdminAssignDelivery() {
       const headers = getAuthHeaders();
 
       const [deliveryRes, agentRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/delivery/unassigned', { headers }),
-        axios.get('http://localhost:5000/api/admin/agents', { headers })
+        api.get('api/delivery/unassigned', { headers }),
+        api.get('api/admin/agents', { headers })
       ]);
 
       setDeliveries(Array.isArray(deliveryRes.data) ? deliveryRes.data : []);
@@ -65,8 +66,8 @@ function AdminAssignDelivery() {
 
     try {
       const headers = getAuthHeaders();
-      await axios.post(
-        `http://localhost:5000/api/delivery/assign/${deliveryId}`,
+      await api.post(
+        `api/delivery/assign/${deliveryId}`,
         { agentId },
         { headers }
       );
@@ -90,8 +91,8 @@ function AdminAssignDelivery() {
 
     try {
       const headers = getAuthHeaders();
-      await axios.delete(
-        `http://localhost:5000/api/delivery/admin-delete/${deliveryId}`,
+      await api.delete(
+        `api/delivery/admin-delete/${deliveryId}`,
         { headers }
       );
       toast.success('✅ Delivery deleted and user notified');

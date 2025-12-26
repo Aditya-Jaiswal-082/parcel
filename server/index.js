@@ -1,61 +1,66 @@
 // server/index.js
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
 const dotenv = require("dotenv");
+
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ======= Middleware =======
-app.use(cors());
+// ======= BODY PARSERS (🔥 REQUIRED) =======
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// ======= Test Route =======
-app.get('/', (req, res) => {
-  res.send('🚀 Server is running...');
+// ======= CORS CONFIG =======
+const allowedOrigins = [
+  "https://parcelswift.vercel.app",
+  "http://localhost:3000"
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      if (!allowedOrigins.includes(origin)) {
+        return callback(
+          new Error("CORS policy does not allow this origin"),
+          false
+        );
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+  })
+);
+
+// ======= TEST ROUTE =======
+app.get("/", (req, res) => {
+  res.send("🚀 Server is running...");
 });
 
-// ======= Connect to MongoDB =======
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => {
-  console.log('✅ Connected to MongoDB ATLAS');
-  app.listen(PORT, () => {
-    console.log(`🌐 Server running on port ${PORT}`);
-  });
-}).catch((err) => console.error('❌ MongoDB connection error:', err));
+// ======= ROUTES =======
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/delivery", require("./routes/delivery"));
+app.use("/api/notifications", require("./routes/notification"));
+app.use("/api", require("./routes/distance"));
+app.use("/api/admin", require("./routes/admin"));
+app.use("/api/agent", require("./routes/agent"));
 
-// ======= Routes =======
-
-// 🔐 Auth (Login/Register)
-const authRoutes = require('./routes/auth');
-app.use('/api/auth', authRoutes);
-
-// 📦 Deliveries
-const deliveryRoutes = require('./routes/delivery');
-app.use('/api/delivery', deliveryRoutes);
-
-// 🛎️ Notifications (In-App)
-const notificationRoutes = require('./routes/notification');
-app.use('/api/notifications', notificationRoutes);
-
-// 🧮 Distance Calculation (if used for pricing)
-const distanceRoutes = require('./routes/distance');
-app.use('/api', distanceRoutes);
-
-// 🛂 Admin (Manage users, assign deliveries)
-const adminRoutes = require('./routes/admin');
-app.use('/api/admin', adminRoutes);
-
-
-const agentRoutes = require('./routes/agent');
-app.use('/api/agent', agentRoutes);
-
-// ======= Error Handling Middleware (optional) =======
+// ======= ERROR HANDLER =======
 app.use((err, req, res, next) => {
-  console.error('❌ Internal Error:', err.stack);
-  res.status(500).json({ error: 'Internal server error' });
+  console.error("❌ Internal Error:", err.stack);
+  res.status(500).json({ error: "Internal server error" });
 });
+
+// ======= DB + SERVER =======
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("✅ Connected to MongoDB ATLAS");
+    app.listen(PORT, () => {
+      console.log(`🌐 Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => console.error("❌ MongoDB connection error:", err));

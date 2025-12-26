@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import './parcel.css';
+import api from "../api/api";
 
 function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -13,7 +14,7 @@ function ForgotPassword() {
     setError('');
 
     try {
-      await axios.post('http://localhost:5000/api/auth/forgot-password', { email });
+      await api.post('api/auth/forgot-password', { email });
       setMessage('If that email exists, a reset link has been sent.');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to send reset email');

@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './Payments.css';
+import api from "../api/api";
 
 function Payments() {
   const location = useLocation();
@@ -350,7 +351,7 @@ function Payments() {
                   return;
                 }
 
-                await axios.post('http://localhost:5000/api/delivery/create', payload, {
+                await api.post('api/delivery/create', payload, {
                   headers: { 
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
