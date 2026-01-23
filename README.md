@@ -4,11 +4,11 @@ A Modern Home-to-Home Parcel Delivery Platform
 
 Role-Based • Secure • Scalable • Real-World
 
-🌐 Live Demo
+🌐 Live Demo (parcelswift.vercel.app)
  •
-⚙️ Backend API
+⚙️ Backend API (parcel-swift.onrender.com)
  •
-📂 GitHub Repository
+📂 GitHub Repository (github.com/Aditya-Jaiswal-082/parcel)
 
 </div>
 ✨ Overview
