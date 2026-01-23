@@ -1,51 +1,52 @@
 <div align="center">
-🚚 ParcelSwift
+ParcelSwift
 A Modern Home-to-Home Parcel Delivery Platform
 
-Role-Based • Secure • Scalable • Real-World
+Role-Based • Secure • Scalable • Production-Ready
 
-🌐 Live Demo (parcelswift.vercel.app)
+Live Demo (https://parcelswift.vercel.app)
  •
-⚙️ Backend API (parcel-swift.onrender.com)
- •
-📂 GitHub Repository (github.com/Aditya-Jaiswal-082/parcel)
+Backend API (https://parcel-swift.onrender.com)
 
 </div>
+
 ✨ Overview
 
-ParcelSwift is a full-stack parcel delivery web application built to simplify home-to-home logistics using a role-based workflow.
-It enables customers to create and track deliveries, agents to manage pickup and drop operations, and administrators to oversee assignments — all with real-time updates and secure access.
+ParcelSwift is a full-stack web application designed to streamline home-to-home parcel delivery through a secure, role-based system.
+It provides dedicated dashboards for Customers, Delivery Agents, and Administrators, enabling transparent delivery tracking, efficient agent assignment, and automated notifications.
 
-Designed for individual users, SMEs, and local vendors, ParcelSwift bridges the gap between enterprise logistics systems and instant delivery platforms.
+Built as a real-world logistics solution for individuals, SMEs, and local vendors.
 
-🌟 Why ParcelSwift?
 
-✔ Real-world logistics problem
-✔ Multi-role architecture
-✔ Google Maps–powered pricing
-✔ Secure JWT authentication
-✔ Production deployment (Vercel + Render)
+Why ParcelSwift?
 
-👥 Role-Based Features
+Real-world logistics use case
+Role-based access control (RBAC)
+Google Maps powered pricing & tracking
+Secure JWT authentication
+Deployed on cloud (Vercel + Render)
+Scalable backend architecture
 
-1. 👤 Customer
+💠User Roles & Features
+
+1. Customer
 
 Create parcel delivery requests
 
-Google Maps address autocomplete
+Google Maps Autocomplete for pickup & drop
 
-Distance-based price calculation
+Distance-based delivery pricing
 
-Unique tracking ID for every delivery
+Unique tracking ID for every parcel
 
-Real-time delivery status updates
+Real-time delivery status tracking
 
-Email notifications on every event
+Email notifications at every stage
 
 Cash on Delivery (COD)
 
 
-2. 🚴 Delivery Agent
+2. Delivery Agent
 
 View unassigned & assigned deliveries
 
@@ -57,52 +58,51 @@ Confirm COD payment at pickup
 
 In-app notifications
 
-
-3. 🛠 Administrator
+3. Administrator
 
 Assign deliveries to agents
 
-Monitor delivery lifecycle
+Monitor complete delivery lifecycle
 
 Handle cancellations with reasons
 
-Manage users and agents
+Manage users & agents
 
-System-wide visibility
+Full system visibility
 
 
-🔄 Delivery Workflow
+🔄 Delivery Lifecycle
+
 Created → Assigned → On Pickup → Payment Done → In Progress → Delivered
 
 
-✔ Transparent
-✔ Trackable
-✔ Accountable
+This structured flow ensures transparency, accountability, and traceability.
+
 
 🧠 Problem Solved
 
-Traditional parcel systems suffer from:
+Traditional delivery systems suffer from:
 
-Limited transparency
+Poor transparency
 
 Manual coordination
 
-Poor communication
+Limited notifications
 
-Expensive enterprise tools
+Enterprise-only solutions
 
-ParcelSwift delivers:
+ParcelSwift solves this by offering:
 
-Clear delivery lifecycle
+Clear multi-step tracking
 
 Automated notifications
 
-Secure role-based access
+Secure role-based workflows
 
-Affordable, scalable logistics
+Affordable logistics for SMEs
 
 
-🛠 Tech Stack
+Tech Stack
 
 Frontend
 
@@ -134,18 +134,30 @@ Integrations
 
 📧 Nodemailer
 
+Tools & Platforms
 
-🌐 Deployment
-Layer	     Platform
-Frontend	 Vercel
-Backend    	Render
-Database	MongoDB Atlas
+Git & GitHub
 
-React (Vercel)
-   ↓
-Node + Express (Render)
-   ↓
+Postman
+
+VS Code
+
+npm
+
+Vercel (Frontend Hosting)
+
+Render (Backend Hosting)
+
+
+Deployment Architecture
+
+React Frontend (Vercel)
+        ↓
+Node.js + Express API (Render)
+        ↓
 MongoDB Atlas
+        ↓
+Google Maps APIs & Email Services
 
 
 🔐 Security
@@ -154,60 +166,114 @@ JWT-based authentication
 
 Role-based authorization
 
-Secure API endpoints
+Secure REST APIs
 
 Duplicate order prevention
 
-Environment-based configs
+Environment-based configuration
 
 
-⚙️ Local Setup
-git clone https://github.com/yourusername/parcelswift.git
 
+⚙️ Local Setup (Run Locally)
+1️⃣ Clone the Repository
+git clone https://github.com/Aditya-Jaiswal-082/parcel.git
+cd parcelswift
+
+2️⃣ Install Dependencies
+Backend
+cd backend
 npm install
 
-Create .env file:
+Frontend
+cd ../frontend
+npm install
 
-MONGO_URI=
-JWT_SECRET=
-GOOGLE_MAPS_API_KEY=
-EMAIL_CREDENTIALS=
+3️⃣ Configure Environment Variables
 
-Run server:
+Create a .env file inside the backend folder:
 
+MONGO_URI=your_mongodb_connection_string 
+JWT_SECRET=your_jwt_secret
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+EMAIL_USER=your_email
+EMAIL_PASS=your_email_password
+
+
+⚠️ Do not commit .env files to GitHub.
+Add .env file in the .gitignore
+
+4️⃣ Run the Application
+
+Start Backend
+cd backend
 npm start
 
+Runs on:
 
-🧪 Testing
-
-Unit Testing (APIs)
-
-Integration Testing
-
-Manual UAT (User / Agent / Admin)
-
-API testing via Postman
+http://localhost:5000
 
 
-🚧 Limitations
+Start Frontend
+cd frontend
+npm start
+
+Runs on:
+
+http://localhost:3000
+
+
+Testing
+
+Unit Testing (Backend APIs)
+
+Integration Testing (Frontend ↔ Backend)
+
+Manual User Acceptance Testing (User / Agent / Admin)
+
+API testing using Postman
+
+
+
+Current Limitations
 
 Only Cash on Delivery supported
 
-No live GPS tracking
+No live GPS tracking yet
 
-Semi-manual agent assignment
+Agent assignment is semi-manual
 
-Rewards & referrals pending
+Rewards & referral system pending
 
 
-🚀 Future Enhancements
+Future Enhancements
 
 💳 UPI / Wallet / Card payments
 
-📡 Live GPS tracking (WebSockets)
+📡 Live parcel tracking (WebSockets + GPS)
 
 🤖 AI-based agent assignment
 
-🎁 Referral & reward system
+🎁 Referral & rewards system
 
 📊 Advanced admin analytics
+
+🧩 E-commerce platform integration
+
+
+Aditya Jaiswal
+jaiswaladitya.vercel.app
+Bachelor of Engineering – Computer Science
+Parul University, Vadodara
+
+
+📄 License
+
+Developed as a major academic project.
+Open for learning, demonstration, and portfolio use.
+
+<div align="center">
+⭐ If you like this project, give it a star
+
+Built with a real-world engineering mindset.
+
+</div>
